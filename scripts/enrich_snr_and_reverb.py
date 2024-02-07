@@ -5,13 +5,11 @@ from datasets import load_dataset
 from multiprocess import set_start_method
 import torch 
 
-dataset = load_dataset("ylacombe/english_dialects", "irish_male")
 
 model = Model.from_pretrained(
     Path("artefacts/best.ckp"),
     strict=False,
 )
-pipeline = RegressiveActivityDetectionPipeline(segmentation=model)
 
 # TODO: make compatible with streaming
 # TODO: make compatible with other naming
@@ -19,6 +17,11 @@ def vad_apply(batch, rank=None):
     if rank:
         # move the model to the right GPU if not there already
         device = f"cuda:{(rank or 0)% torch.cuda.device_count()}"
+        # move to device and create pipeline here because the pipeline moves to the first GPU it finds anyway
+        model.to(device)
+
+    pipeline = RegressiveActivityDetectionPipeline(segmentation=model)
+    if rank:
         pipeline.to(torch.device(device))
     
     device = pipeline._models["segmentation"].device
@@ -46,6 +49,7 @@ def vad_apply(batch, rank=None):
     
 if __name__ == "__main__":
     set_start_method("spawn")
+    dataset = load_dataset("ylacombe/english_dialects", "irish_male")
     
     # sampling_rate = next(iter(dataset))["audio"]["sampling_rate"]    
     # dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))

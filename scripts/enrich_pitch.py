@@ -27,15 +27,9 @@ center = 'half-hop'
 interp_unvoiced_at = .065
 
 
-
-dataset = load_dataset("ylacombe/english_dialects", "irish_male")
-
 # TODO: make compatible with streaming
 # TODO: make compatible with other naming
 def pitch_apply(batch, rank=None):
-    
-
-
     if isinstance(batch["audio"], list):  
         utterance_pitch_mean = []
         utterance_pitch_std = []
@@ -81,6 +75,7 @@ if __name__ == "__main__":
     
     # sampling_rate = next(iter(dataset))["audio"]["sampling_rate"]    
     # dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))
+    dataset = load_dataset("ylacombe/english_dialects", "irish_male")
 
     updated_dataset = dataset.map(
         pitch_apply,

@@ -4,9 +4,6 @@ from multiprocess import set_start_method
 
 
 
-dataset = load_dataset("ylacombe/english_dialects", "irish_male")
-
-
 transducer = make_g2p('eng', 'eng-ipa')
 
 
@@ -47,6 +44,7 @@ def rate_apply(batch, rank=None):
     
 if __name__ == "__main__":
     set_start_method("spawn")
+    dataset = load_dataset("ylacombe/english_dialects", "irish_male")
     
     # sampling_rate = next(iter(dataset))["audio"]["sampling_rate"]    
     # dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))
