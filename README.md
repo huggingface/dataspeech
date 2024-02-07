@@ -4,8 +4,7 @@ wget https://huggingface.co/ylacombe/brouhaha-best/resolve/main/best.ckpt?downlo
 
 
 TODO:
-- [] Parallelism for VAD, SNR, C50
-- [] Benchmark for parallelism
 - [] Benchmark for best dataset format
+- [] Script conversion to webdatasets
 - [] Silence removal at the beginning and at the end of the audio
-- [] Speaking rate (nb_phonemes / utterance_length) 
+- [] Speaking rate (nb_phonemes / utterance_length) for multilingual ?
