@@ -3,3 +3,4 @@ accelerate
 https://github.com/marianne-m/brouhaha-vad/archive/main.zip
 penn
 g2p
+webdataset
