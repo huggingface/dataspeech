@@ -1,15 +1,10 @@
 from pyannote.audio import Model
 from pathlib import Path
 from brouhaha.pipeline import RegressiveActivityDetectionPipeline
-from datasets import load_dataset
-from multiprocess import set_start_method
 import torch 
-
 
 model = None
 
-# TODO: make compatible with streaming
-# TODO: make compatible with other naming
 def snr_apply(batch, rank=None):
     global model
     if model is None:
@@ -49,24 +44,3 @@ def snr_apply(batch, rank=None):
         batch["c50"] = res["c50"].mean()
 
     return batch
-    
-if __name__ == "__main__":
-    set_start_method("spawn")
-    dataset = load_dataset("ylacombe/english_dialects", "irish_male")
-    
-    # sampling_rate = next(iter(dataset))["audio"]["sampling_rate"]    
-    # dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))
-
-    updated_dataset = dataset.map(
-        snr_apply,
-        batched=True,
-        batch_size=16,
-        with_rank=True,
-        num_proc=torch.cuda.device_count()
-    )
-    
-    updated_dataset.save_to_disk("artefacts/english_dialects_irish")
-    # updated_dataset.push_to_hub("ylacombe/english_dialects", "irish_male")
-    
-    print("ok")
-    
