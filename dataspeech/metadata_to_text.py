@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
 from datasets import load_dataset
-from accelerate.logging import get_logger
 from multiprocess import set_start_method
 import argparse
 
-logger = get_logger(__name__)
 
 SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "fairly slowly", "moderate speed", "fairly fast", "quite fast", "very fast"]
 SNR_BINS = ["very noisy", "quite noisy", "fairly noisy", "moderately noisy", "fairly quiet", "quite quiet", "very quiet"]
@@ -16,8 +14,7 @@ UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "fairly monotone", "mo
 SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "fairly low pitch", "moderate pitch", "fairly high pitch", "quite high pitch", "very high pitch"]
 
 
-
-def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1):
+def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1, std_tolerance=5):
     '''
     Compute bins of `column_name` from the splits `leading_split_for_bins` and apply text bins to every split.
     `leading_split_for_bins` can be a string or a list.
@@ -25,16 +22,22 @@ def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_sp
     if isinstance(leading_split_for_bins, str):
         leading_split_for_bins = [leading_split_for_bins]
         
-    list_values = dataset[leading_split_for_bins[0]][column_name]
+    values = dataset[leading_split_for_bins[0]][column_name]
     for split in leading_split_for_bins[1:]:
-        list_values.extend(dataset[split][column_name])
+        values.extend(dataset[split][column_name])
 
-    hist, bin_edges = np.histogram(list_values, bins = len(text_bins))
+    # filter out outliers
+    values = np.array(values)
+    if std_tolerance is not None:
+        values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
+
+    hist, bin_edges = np.histogram(values, bins = len(text_bins))
     
     def batch_association(batch):
         index_bins = np.searchsorted(bin_edges, batch, side="left")
-        # do max(...) because when value == min(bins), the associated index is 0
-        batch_bins = [text_bins[max(i-1, 0)] for i in index_bins]
+        # do min(max(...)) when values are outside of the main bins
+        # it happens when value = min or max or have been filtered out from bins computation
+        batch_bins = [text_bins[min(max(i-1, 0), len(text_bins)-1)] for i in index_bins]
         return {
             output_column_name: batch_bins
         }
@@ -65,7 +68,7 @@ def do_mean_values_per_speaker(dataset, speaker_column_name, column_names_to_mea
     return dataset
     
 
-def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, gender_column_name, column_name, output_column_name, batch_size = 4, num_workers=1):
+def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, gender_column_name, column_name, output_column_name, batch_size = 4, num_workers=1, std_tolerance=None):
     '''
     Computes mean values on a speaker level and computes bins on top relative to the gender column name.
     Then associate a text bin to the column.
@@ -81,15 +84,21 @@ def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, ge
     
     bin_edges = {}
     for category in ["male", "female"]:
-        bin_edges[category] = np.histogram(dataframe[dataframe[gender_column_name] == category][column_name], len(text_bins))[1]
+        values = dataframe[dataframe[gender_column_name] == category][column_name]
+        values = np.array(values)
+        if std_tolerance is not None:
+            # filter out outliers
+            values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
+        bin_edges[category] = np.histogram(values, len(text_bins))[1]
         
     # 
     speaker_id_to_bins = dataframe.apply(lambda x: np.searchsorted(bin_edges[x[gender_column_name]], x[column_name]), axis=1).to_dict()
         
     def batch_association(batch):
         index_bins = [speaker_id_to_bins[speaker] for speaker in batch]
-        # do max(...) because when value == min(bins), the associated index is 0
-        batch_bins = [text_bins[max(i-1, 0)] for i in index_bins]
+        # do min(max(...)) when values are outside of the main bins
+        # it happens when value = min or max or have been filtered out from bins computation
+        batch_bins = [text_bins[min(max(i-1, 0), len(text_bins)-1)] for i in index_bins]
         return {
             output_column_name: batch_bins
         }
@@ -121,19 +130,15 @@ if __name__ == "__main__":
 
 
 
-    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, "speaker_id", "gender", "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers)
-    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"])
-    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"])
-    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"])
-    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"])
-
-    dataset = do_mean_values_per_speaker(dataset, speaker_column_name="speaker_id", column_names_to_mean=["utterance_pitch_mean"], batch_size=args.batch_size, num_workers=args.cpu_num_workers)
+    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, "speaker_id", "gender", "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=3)
+    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=5)
+    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=10)
+    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=10)
+    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=5)
 
     if args.dump_folder_path:
-        logger.info("Saving to disk...")
         dataset.save_to_disk(args.dump_folder_path)
     if args.repo_id:
-        logger.info("Pushing to the hub...")
         if args.configuration:
             dataset.push_to_hub(args.repo_id, args.configuration)
         else:
