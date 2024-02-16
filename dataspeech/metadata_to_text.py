@@ -6,9 +6,9 @@ import argparse
 
 
 SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "fairly slowly", "moderate speed", "fairly fast", "quite fast", "very fast"]
-SNR_BINS = ["very noisy", "quite noisy", "fairly noisy", "moderately noisy", "fairly quiet", "quite quiet", "very quiet"]
+SNR_BINS = ["very noisy", "quite noisy", "fairly noisy", "moderate ambient sound", "fairly quiet", "quite quiet", "very quiet"]
 REVERBERATION_BINS = ["very roomy sounding", "quite roomy sounding", "fairly roomy sounding", "moderate reverberation", "fairly confined sounding", "quite confined sounding", "very confined sounding"]
-UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "fairly monotone", "moderately monotone", "fairly expressive", "quite expressive", "very expressive"]
+UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "fairly monotone", "moderate intonation", "fairly expressive", "quite expressive", "very expressive"]
 
 # this one is supposed to be apply to speaker-level mean pitch, and relative to gender
 SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "fairly low pitch", "moderate pitch", "fairly high pitch", "quite high pitch", "very high pitch"]
