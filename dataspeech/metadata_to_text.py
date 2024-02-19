@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 from multiprocess import set_start_method
 import argparse
 
@@ -112,8 +112,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     
-    parser.add_argument("dataset_name", type=str, help="Repo id.")
-    parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use.")
+    parser.add_argument("dataset_name", type=str, help="Repo id (or repo ids separated by +).")
+    parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use (or config separated by +).")
     parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dasaset on disk.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers.")
@@ -124,17 +124,40 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.configuration:
-        dataset = load_dataset(args.dataset_name, args.configuration)
+        if "+" in args.dataset_name:
+            dataset_names = args.dataset_name.split("+")
+            dataset_configs = args.configuration.split("+")
+            if len(dataset_names) != len(dataset_configs):
+                raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(dataset_configs)} configuration spotted")
+            
+            dataset = DatasetDict()
+            for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
+                tmp_dataset = load_dataset(dataset_name, dataset_config)
+                for split in tmp_dataset:
+                    dataset[f"{dataset_name}.{dataset_config}.{split}"] = tmp_dataset[split]
+            
+        else:
+            dataset = load_dataset(args.dataset_name, args.configuration)
     else:
-        dataset = load_dataset(args.dataset_name)
+        if "+" in args.dataset_name:
+            dataset_names = args.dataset_name.split("+")
+            dataset = DatasetDict()
+            for dataset_name in zip(dataset_names):
+                tmp_dataset = load_dataset(dataset_name)
+                for split in tmp_dataset:
+                    dataset[f"{dataset_name}.{split}"] = tmp_dataset[split]
 
+        else:
+            dataset = load_dataset(args.dataset_name)
 
-
+    # TODO: leading split  in config
+    leading_split_for_bins = ["ylacombe/libritts_r_tags.clean.train.clean.100", "ylacombe/libritts_r_tags.clean.train.clean.360", "ylacombe/libritts_r_tags.other.train.other.500"]
+    
     dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, "speaker_id", "gender", "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=3)
-    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=5)
-    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=10)
-    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=10)
-    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=["train.clean.100", "train.clean.360"], std_tolerance=5)
+    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=5)
+    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=4)
+    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=10)
+    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=5)
 
     if args.dump_folder_path:
         dataset.save_to_disk(args.dump_folder_path)
@@ -143,4 +166,11 @@ if __name__ == "__main__":
             dataset.push_to_hub(args.repo_id, args.configuration)
         else:
             dataset.push_to_hub(args.repo_id)
-    
+            
+
+    #for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
+    #    tmp_dataset = load_dataset(dataset_name, dataset_config)
+    #    for split in tmp_dataset:
+    #        tmp_dataset[split] = dataset[f"{dataset_name}.{dataset_config}.{split}"]
+    #    
+    #    tmp_dataset.push_to_hub("stable-speech/libritts-r-tags-and-text", dataset_config)
