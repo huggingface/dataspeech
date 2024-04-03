@@ -19,7 +19,7 @@ def wrap_audio(audio, sr):
     }
 
 
-# TODO: make compatible with other naming and stems
+# TODO(YL): make compatible with other naming and stems
 def filter_stems(batch, rank=None):
     if rank is not None:
         # move the model to the right GPU if not there already
