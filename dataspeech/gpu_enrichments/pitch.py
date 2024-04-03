@@ -23,11 +23,8 @@ center = 'half-hop'
 # (Optional) Linearly interpolate unvoiced regions below periodicity threshold
 interp_unvoiced_at = .065
 
-# TODO: add to arg
-audio_column_name = "audio"
-output_column_name = "utterance_pitch"
 
-def pitch_apply(batch, rank=None):
+def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name="utterance_pitch"):
     if isinstance(batch[audio_column_name], list):  
         utterance_pitch_mean = []
         utterance_pitch_std = []

@@ -5,7 +5,7 @@ import torch
 
 model = None
 
-def snr_apply(batch, rank=None):
+def snr_apply(batch, rank=None, audio_column_name="audio",):
     global model
     if model is None:
         model = Model.from_pretrained(
@@ -24,10 +24,10 @@ def snr_apply(batch, rank=None):
     
     device = pipeline._models["segmentation"].device
 
-    if isinstance(batch["audio"], list):  
+    if isinstance(batch[audio_column_name], list):  
         snr = []
         c50 = []
-        for sample in batch["audio"]:
+        for sample in batch[audio_column_name]:
             res = pipeline({"sample_rate": sample["sampling_rate"],
                             "waveform": torch.tensor(sample["array"][None, :]).to(device).float()})
             
@@ -37,8 +37,8 @@ def snr_apply(batch, rank=None):
         batch["snr"] = snr
         batch["c50"] = c50
     else:
-        res = pipeline({"sample_rate": batch["audio"]["sampling_rate"],
-                        "waveform": torch.tensor(batch["audio"]["array"][None, :]).to(device).float()})
+        res = pipeline({"sample_rate": batch[audio_column_name]["sampling_rate"],
+                        "waveform": torch.tensor(batch[audio_column_name]["array"][None, :]).to(device).float()})
         
         batch["snr"] = res["snr"].mean()
         batch["c50"] = res["c50"].mean()

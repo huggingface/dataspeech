@@ -40,7 +40,8 @@ if __name__ == "__main__":
         with_rank=False,
         num_proc=args.cpu_num_workers,
         writer_batch_size= args.cpu_writer_batch_size,
-        remove_columns=[audio_column_name]
+        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+        fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
     )
 
     print("Compute snr and reverb")
@@ -50,7 +51,8 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         with_rank=True if torch.cuda.device_count()>0 else False,
         num_proc=torch.cuda.device_count() if torch.cuda.device_count()>0 else args.cpu_num_workers,
-        remove_columns=[audio_column_name]
+        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+        fn_kwargs={"audio_column_name": audio_column_name},
     )
     
     print("Compute pitch")
@@ -60,7 +62,8 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         with_rank=True if torch.cuda.device_count()>0 else False,
         num_proc=torch.cuda.device_count() if torch.cuda.device_count()>0 else args.cpu_num_workers,
-        remove_columns=[audio_column_name]
+        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+        fn_kwargs={"audio_column_name": audio_column_name},
     )
     
     for split in dataset.keys():
