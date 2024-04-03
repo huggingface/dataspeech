@@ -4,6 +4,9 @@ from demucs.audio import convert_audio
 from datasets import load_dataset
 from multiprocess import set_start_method
 import torch
+import argparse
+from datasets import Audio
+
 
 
 demucs = pretrained.get_model('htdemucs')
@@ -16,7 +19,6 @@ def wrap_audio(audio, sr):
     }
 
 
-# TODO: make compatible with streaming
 # TODO: make compatible with other naming and stems
 def filter_stems(batch, rank=None):
     if rank is not None:
@@ -50,30 +52,43 @@ def filter_stems(batch, rank=None):
     
 if __name__ == "__main__":
     set_start_method("spawn")
-    dataset = load_dataset("ylacombe/music_genres_Punk")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset_name", type=str, help="Path or name of the dataset. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/loading_methods#datasets.load_dataset.path")
+    parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use, if necessary.")
+    parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dataset on disk with this path.")
+    parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
+    parser.add_argument("--audio_column_name", default="audio", type=str, help="Column name of the audio column to be separated.")
+    parser.add_argument("--batch_size", default=8, type=int, help="Batch size. Speeds up operations on GPU.")
+    args = parser.parse_args()
     
-    # sampling_rate = next(iter(dataset))["audio"]["sampling_rate"]    
-    # dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))
-    
-    dataset = dataset.shuffle(seed=42)
-    dataset["train"] = dataset["train"].select(range(100))
-    
+    if args.configuration:
+        dataset = load_dataset(args.dataset_name, args.configuration)
+    else:
+        dataset = load_dataset(args.dataset_name)    
+
+
+    num_proc = torch.cuda.device_count() if torch.cuda.device_count() > 1 else None
 
     updated_dataset = dataset.map(
         filter_stems,
         batched=True,
-        batch_size=8,
+        batch_size=args.batch_size,
         with_rank=True,
-        num_proc=torch.cuda.device_count()
+        num_proc=num_proc,
     )
     
-    from datasets import Audio
     updated_dataset = updated_dataset.cast_column("vocals", Audio())
     updated_dataset = updated_dataset.cast_column("others", Audio())
-    updated_dataset.push_to_hub("ylacombe/tiny-punk")
     
-    updated_dataset.save_to_disk("artefacts/english_dialects_irish")
-    # updated_dataset.push_to_hub("patrickvonplaten/bella_ciao")
+    if args.dump_folder_path:
+        print("Saving to disk...")
+        updated_dataset.save_to_disk(args.dump_folder_path)
+    if args.repo_id:
+        print("Pushing to the hub...")
+        if args.configuration:
+            updated_dataset.push_to_hub(args.repo_id, args.configuration)
+        else:
+            updated_dataset.push_to_hub(args.repo_id)
     
-    print("ok")
-    
+
