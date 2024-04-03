@@ -11,7 +11,7 @@ source = demucs.sources
 
 def wrap_audio(audio, sr):
     return {
-        "array": audio.cpu().numpy().T,
+        "array": audio.cpu().numpy(),
         "sampling_rate": sr
     }
 
@@ -33,11 +33,8 @@ def filter_stems(batch, rank=None):
         wavs = torch.nn.utils.rnn.pad_sequence(wavs, batch_first=True, padding_value=0.0).transpose(1,2)
         stems = apply_model(demucs, wavs)
         
-
-
-
-        batch["vocals"] = [wrap_audio(s[-1,:,:length], demucs.samplerate) for (s,length) in zip(stems, wavs_length)]
-        batch["others"] = [wrap_audio(s[:-1, :,:length].sum(0), demucs.samplerate) for (s,length) in zip(stems, wavs_length)]
+        batch["vocals"] = [wrap_audio(s[-1,:,:length].mean(0), demucs.samplerate) for (s,length) in zip(stems, wavs_length)]
+        batch["others"] = [wrap_audio(s[:-1, :,:length].sum(0).mean(0), demucs.samplerate) for (s,length) in zip(stems, wavs_length)]
         
     else:
         audio = torch.tensor(batch["audio"]["array"].squeeze(), device=device).to(torch.float32)
@@ -46,22 +43,26 @@ def filter_stems(batch, rank=None):
                 audio, sample_rate, demucs.samplerate, demucs.audio_channels)
         stems = apply_model(demucs, audio[None])
         
-        batch["vocals"] = wrap_audio(stems[0,-1], demucs.samplerate)
-        batch["others"] = wrap_audio(stems[0, :-1].sum(0), demucs.samplerate)
+        batch["vocals"] = wrap_audio(stems[0,-1].mean(0), demucs.samplerate)
+        batch["others"] = wrap_audio(stems[0, :-1].sum(0).mean(0), demucs.samplerate)
 
     return batch
     
 if __name__ == "__main__":
     set_start_method("spawn")
-    dataset = load_dataset("patrickvonplaten/bella_ciao")
+    dataset = load_dataset("ylacombe/music_genres_Punk")
     
     # sampling_rate = next(iter(dataset))["audio"]["sampling_rate"]    
     # dataset = dataset.cast_column("audio", Audio(sampling_rate=sampling_rate))
+    
+    dataset = dataset.shuffle(seed=42)
+    dataset["train"] = dataset["train"].select(range(100))
+    
 
     updated_dataset = dataset.map(
         filter_stems,
         batched=True,
-        batch_size=16,
+        batch_size=8,
         with_rank=True,
         num_proc=torch.cuda.device_count()
     )
@@ -69,6 +70,7 @@ if __name__ == "__main__":
     from datasets import Audio
     updated_dataset = updated_dataset.cast_column("vocals", Audio())
     updated_dataset = updated_dataset.cast_column("others", Audio())
+    updated_dataset.push_to_hub("ylacombe/tiny-punk")
     
     updated_dataset.save_to_disk("artefacts/english_dialects_irish")
     # updated_dataset.push_to_hub("patrickvonplaten/bella_ciao")
