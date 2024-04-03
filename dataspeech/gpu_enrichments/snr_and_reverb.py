@@ -2,14 +2,15 @@ from pyannote.audio import Model
 from pathlib import Path
 from brouhaha.pipeline import RegressiveActivityDetectionPipeline
 import torch 
+from huggingface_hub import hf_hub_download
 
 model = None
 
-def snr_apply(batch, rank=None, audio_column_name="audio",):
+def snr_apply(batch, rank=None, audio_column_name="audio"):
     global model
     if model is None:
         model = Model.from_pretrained(
-            Path("artefacts/best.ckp"),
+            Path(hf_hub_download(repo_id="ylacombe/brouhaha-best", filename="best.ckpt")),
             strict=False,
         )
     if rank:
