@@ -5,3 +5,4 @@ g2p
 webdataset
 demucs
 transformers
+accelerate

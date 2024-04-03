@@ -1,3 +1,26 @@
+
+
+Don't forget to describe that you create another dataset
+
+Don't forget to add examples script
+
+Don't forget to add utility to merge datasets
+            # TODO: probably should clean phonemes before using it for speaking_rate 
+
+
+Don't forget to add accent classifier + LLM annotation
+
+TODO: clean metadata
+TODO add tools to visualize
+
+TODO: shoutout to datasets and other libraries
+
+
+TODO: Sanchit - what to do with run_dataset_concatenation.py -> better naming ?
+https://github.com/sanchit-gandhi/stable-speech/blob/main/run_dataset_concatenation.py
+
+
+
 # Data-Speech
 
 Data-Speech is a suite of utility scripts designed to enrich audio speech datasets. 
@@ -18,40 +41,56 @@ cd dataspeech
 pip install -r requirements.txt
 ```
 
-## Usage
+## Use-cases
+
+Current use-cases covers:
+- Annotate an audio speech dataset using `main.py` to get the following continuous variables:
+    - Speaking rate `(nb_phonemes / utterance_length)`
+    - Speech-to-noise ratio
+    - Reverberation
+    - Pitch estimation
+- Map the previous annotations categorical to discrete keywords bins using `scripts/metadata_to_text.py`
+- Create natural language descriptions from a set of keywords using `scripts/run_prompt_creation.py`
+
+Moreover, additional scripts cover other use-cases such as:
+- perform audio separation using [demucs](TODO) in a multi-GPU settings
+- add gender information to [MLS](TODO) and [LibriTTS-R](TODO).
+- more to come...
+
+> [!TIP]
+> Scripts from this library can also be used as a starting point for applying other models to datasets from the [datasets library](TODO) in a multi-machine configuration.
+> 
+> For example, `scripts/run_prompt_creation.py` can be adapted to perform large-scaled inference using other LLMs and prompts.
+
+### Generates annotations
+
+TODO
+
+### Map continuous annotations to key-words
+
+TODO
+
+### Generate natural language descriptions
+
+TODO
+
+### Perform audio separation
 
 
-## How does it work
-
-
-
-
-Its 
+## License 
 TODO: check license
 
 
+## Status
+This library is still a WIP. Other utility scripts should come soon.
 
-TODO:
-- [] Current scripts only work on a single machine
-- [] Benchmark for best dataset format
-- [] Script conversion to webdatasets
-- [] Silence removal at the beginning and at the end of the audio
-- [] Speaking rate (nb_phonemes / utterance_length) for multilingual ?
-- [] Make it compatible with streaming -> much more interesting ?
+### TODOs
+- [ ] Accent classification training script
+- [ ] Accent classification inference script
+- [ ] Better speaking rate estimation with long silence removal
+- [ ] Better SNR estimation with other SNR models
+- [ ] Add more annotation categories
+- [ ] Multilingual speaking rate estimation
 
-
-
-Don't forget to describe that you create another dataset
-
-Don't forget to add examples script
-
-Don't forget to add utility to merge datasets
-            # TODO: probably should clean phonemes before using it for speaking_rate 
-
-
-Don't forget to add accent classifier + LLM annotation
-
-TODO: clean metadata
-TODO add tools to visualize
-
-TODO: shoutout to datasets and other libraries
+- [ ] (long term) Benchmark for best audio dataset format
+- [ ] (long term) Compatibility with streaming
