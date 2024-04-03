@@ -5,13 +5,13 @@ from multiprocess import set_start_method
 import argparse
 
 
-SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "fairly slowly", "moderate speed", "fairly fast", "quite fast", "very fast"]
-SNR_BINS = ["very noisy", "quite noisy", "fairly noisy", "moderate ambient sound", "fairly quiet", "quite quiet", "very quiet"]
-REVERBERATION_BINS = ["very roomy sounding", "quite roomy sounding", "fairly roomy sounding", "moderate reverberation", "fairly confined sounding", "quite confined sounding", "very confined sounding"]
-UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "fairly monotone", "moderate intonation", "fairly expressive", "quite expressive", "very expressive"]
+SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "slightly slowly", "moderate speed", "slightly fast", "quite fast", "very fast"]
+SNR_BINS = ["very noisy", "quite noisy", "slightly noisy", "moderate ambient sound", "slightly clear", "quite clear", "very clear"]
+REVERBERATION_BINS = ["very roomy sounding", "quite roomy sounding", "slightly roomy sounding", "moderate reverberation", "slightly confined sounding", "quite confined sounding", "very confined sounding"]
+UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "slightly monotone", "moderate intonation", "slightly expressive", "quite expressive", "very expressive"]
 
 # this one is supposed to be apply to speaker-level mean pitch, and relative to gender
-SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "fairly low pitch", "moderate pitch", "fairly high pitch", "quite high pitch", "very high pitch"]
+SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "slightly low pitch", "moderate pitch", "slightly high pitch", "quite high pitch", "very high pitch"]
 
 
 def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1, std_tolerance=5):
@@ -151,14 +151,25 @@ if __name__ == "__main__":
             dataset = load_dataset(args.dataset_name)
 
     # TODO: leading split  in config
-    leading_split_for_bins = ["ylacombe/libritts_r_tags.clean.train.clean.100", "ylacombe/libritts_r_tags.clean.train.clean.360", "ylacombe/libritts_r_tags.other.train.other.500"]
+    leading_split_for_bins = ["ylacombe/libritts_r_tags.clean.train.clean.100", "ylacombe/libritts_r_tags.clean.train.clean.360", "ylacombe/libritts_r_tags.other.train.other.500", "ylacombe/mls-eng-10k-tags.default.train"]
     
-    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, "speaker_id", "gender", "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=3)
-    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=5)
-    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=4)
-    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=10)
-    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=5)
+    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, "speaker_id", "gender", "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=2)
+    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=4.0)
+    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=3.5)
+    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=4.0)
+    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=leading_split_for_bins, std_tolerance=4.0)
 
+    
+    # for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
+    #     new_dataset = DatasetDict()
+    #     for key in dataset.keys():
+    #         new_key = key.split(".")
+    #         if dataset_name == new_key[0] and dataset_config == new_key[1]:
+    #             new_dataset[new_key[-1]] = dataset[key]
+    #     print("PUSH", f"{dataset_name}_tagged_10k", dataset_config)
+    #     new_dataset.push_to_hub(f"{dataset_name}_tagged_10k", dataset_config)
+        
+        
     if args.dump_folder_path:
         dataset.save_to_disk(args.dump_folder_path)
     if args.repo_id:
