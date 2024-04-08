@@ -133,9 +133,38 @@ Note that default tolerances for extreme values can also be modified by passing 
 
 ### Generate natural language descriptions
 
+Now that we have text bins associated to our datasets, the next step is to create natural language descriptions out of the few created features.
 
+[`scripts/run_prompt_creation.py`](/scripts/run_prompt_creation.py) relies on [`accelerate`](#TODO) and [`transformers`](#TODO) to generate natural language descriptions from LLMs.
+
+[`examples/prompt_creation/run_prompt_creation_dummy.sh`](examples/prompt_creation/run_prompt_creation_dummy.sh) contains a dummy example to get you ready:
+
+```sh
+python run_prompt_creation.py \
+  --dataset_name "ylacombe/libritts_r_tags_and_text" \
+  --dataset_config_name "clean" \
+  --dataset_split_name "dev.clean" \
+  --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
+  --per_device_eval_batch_size 2 \
+  --attn_implementation "sdpa" \
+  --dataloader_num_workers 0 \
+  --output_dir "./" \
+  --load_in_4bit
+```
+
+As usual, we precise the dataset name and configuration we want to enrich. Here, you can also specify a single split, if necessary.
+`model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of the famous Mistral 7B model.
+
+
+The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains two more examples that scale the recipe to respectively 1K and 10K hours of data.
+
+> [!CAUTION]
+> This step generally demands more resources and times and should use one or many GPUs. 
 
 ### Perform audio separation
+
+[`scripts/filter_audio_separation.py`](/scripts/filter_audio_separation.py) is useful to scale-up audio separation, namely separating audio stems.
+In the speech case, it can be used to remove musical and/or noisy background from speech. This script uses [`demucs`].
 
 
 ## License 

@@ -60,6 +60,7 @@ if __name__ == "__main__":
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
     parser.add_argument("--audio_column_name", default="audio", type=str, help="Column name of the audio column to be separated.")
     parser.add_argument("--batch_size", default=8, type=int, help="Batch size. Speeds up operations on GPU.")
+    parser.add_argument("--num_workers_per_gpu", default=1, type=int, help="Number of workers per GPU for transformations that uses GPUs if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
     args = parser.parse_args()
     
     if args.configuration:
@@ -68,7 +69,7 @@ if __name__ == "__main__":
         dataset = load_dataset(args.dataset_name)    
 
 
-    num_proc = torch.cuda.device_count() if torch.cuda.device_count() > 1 else None
+    num_proc = torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count() > 1 else None
 
     updated_dataset = dataset.map(
         filter_stems,
