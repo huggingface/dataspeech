@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--rename_column", action="store_true", help="If activated, rename audio and text column names to 'audio' and 'text'. Useful if you want to merge datasets afterwards.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers for transformations that don't use GPUs or if no GPU are available.")
     parser.add_argument("--cpu_writer_batch_size", default=1000, type=int, help="writer_batch_size for transformations that don't use GPUs. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/main_classes#datasets.Dataset.map.writer_batch_size")
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size when relevant, useful when operations can be performed in batch.")
+    parser.add_argument("--batch_size", default=16, type=int, help="Batch size when relevant, useful when operations can be performed in batch. For now, only useful for pitch estimation.")
     parser.add_argument("--num_workers_per_gpu", default=1, type=int, help="Number of workers per GPU for transformations that uses GPUs if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
 
     args = parser.parse_args()
