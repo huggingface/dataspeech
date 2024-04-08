@@ -13,7 +13,7 @@ if __name__ == "__main__":
     parser.add_argument("dataset_name", type=str, help="Path or name of the dataset. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/loading_methods#datasets.load_dataset.path")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use, if necessary.")
     parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dataset on disk with this path.")
-    parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
+    parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the dataset to the hub.")
     parser.add_argument("--audio_column_name", default="audio", type=str, help="Column name of the audio column to be enriched.")
     parser.add_argument("--text_column_name", default="text", type=str, help="Text column name.")
     parser.add_argument("--rename_column", action="store_true", help="If activated, rename audio and text column names to 'audio' and 'text'. Useful if you want to merge datasets afterwards.")

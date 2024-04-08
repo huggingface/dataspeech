@@ -10,14 +10,8 @@ Don't forget to add utility to merge datasets
 
 Don't forget to add accent classifier + LLM annotation
 
-TODO: clean metadata
-TODO add tools to visualize
 
 TODO: shoutout to datasets and other libraries
-
-
-TODO: Sanchit - what to do with run_dataset_concatenation.py -> better naming ?
-https://github.com/sanchit-gandhi/stable-speech/blob/main/run_dataset_concatenation.py
 
 
 
@@ -105,11 +99,41 @@ The dataset viewer gives an idea of what has been done, namely:
 
 ### Map continuous annotations to key-words
 
-TODO
+The next step is to map the continuous annotations from the previous steps to key-words. To do so, continous annotations are mapped to categorical bins that are then associated to key-words. For example, the speaking rate can be associated to 7 text bins which are: `"very slowly", "quite slowly", "slightly slowly", "moderate speed", "slightly fast", "quite fast", "very fast"`.
+
+This step is more subtile than the previous one, as we generally want to collect a wide variety of speech data to compute accurate key-words.
+
+Indeed, some datasets, such as LibriTTS-R, collect data from only one or a few sources; for LibriTTS-R, these are audiobooks, and the process of collecting or processing the data can result in homogeneous data that can vary. In the case of LibriTTS-R, the data has been cleaned to have little noise, little reverberation, and the audiobooks collected leaves little variety in intonation.
+
+The solution here is to compute bins on aggregated statistics from multiple datasets, using [`scripts/metadata_to_text.py`](/scripts/metadata_to_text.py).
+- A speaker's pitch is calculated by averaging the pitches across its voice clips. The computed pitch estimator is then compared to speakers of the same gender to derive the pitch keyword of the speaker(very high-pitched to very low-pitched).
+- The rest of the keywords are derived by [computing histograms](https://numpy.org/doc/stable/reference/generated/numpy.histogram.html) of the continuous variables over all training samples, from which the extreme values have been eliminated, and associating a keyword with each bin.
+
+The following command line uses the script on a 10K hours subset of MLS English and on the whole LibriTTS-R dataset.
+
+```sh
+python ./scripts/metadata_to_text.py "ylacombe/mls-eng-10k-tags+ylacombe/libritts_r_tags+ylacombe/libritts_r_tags" \
+--configuration "default+clean+other" \
+--dump_folder_path "./tmp_mls+./tmp_tts_clean+./tmp_tts_other" \
+--cpu_num_workers "8" \
+--leading_split_for_bins "train" \
+--plot_directory "./plots/"
+```
+
+Note how we've been able to pass different datasets with different configurations by separating the relevant arguments with `"+"`.
+
+You can learn more about the arguments you can pass to `main.py` by passing:
+
+```sh
+python main.py --help
+```
+
+Note that default tolerances for extreme values can also be modified by passing the desired value to the following arguments: `pitch_std_tolerance`, `speaking_rate_std_tolerance`, `snr_std_tolerance`, `reverberation_std_tolerance`, `speech_monotony_std_tolerance`.
+
 
 ### Generate natural language descriptions
 
-TODO
+
 
 ### Perform audio separation
 
