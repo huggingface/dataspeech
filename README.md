@@ -1,20 +1,3 @@
-
-
-Don't forget to describe that you create another dataset
-
-Don't forget to add examples script
-
-Don't forget to add utility to merge datasets
-            # TODO: probably should clean phonemes before using it for speaking_rate 
-
-
-Don't forget to add accent classifier + LLM annotation
-
-
-TODO: shoutout to datasets and other libraries
-
-
-
 # Data-Speech
 
 Data-Speech is a suite of utility scripts designed to enrich audio speech datasets. 
@@ -22,6 +5,9 @@ Data-Speech is a suite of utility scripts designed to enrich audio speech datase
 Its aim is to provide a simple, clean code base for applying audio transformations or annotations that may be requested as part of the development of speech-based AI models.
 
 Its primary use is to reproduce the annotation method from [Dan Lyth and Simon King's research paper (`Natural language guidance of high-fidelity text-to-speech with synthetic annotations`)](https://arxiv.org/abs/2402.01912) that allows to label various speaker characteristics with natural language description.
+
+This allows us to already tag and release enriched versions of [LibriTTS-R](https://huggingface.co/datasets/blabble-io/libritts_r) and a 10K hours subset of [the English version of MLS](https://www.openslr.org/94/). Datasets can be found [here](https://huggingface.co/parler-tts).
+
 
 ---------
 
@@ -167,9 +153,9 @@ The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains two
 In the speech case, it can be used to remove musical and/or noisy background from speech. This script uses [`demucs`].
 
 
-## License 
-TODO: check license
+## Acknowledgements
 
+This library builds on top of a number of open-source giants, to whom we'd like to extend our warmest thanks for providing these tools!
 
 ## Status
 This library is still a WIP. Other utility scripts should come soon.

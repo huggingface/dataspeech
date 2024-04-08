@@ -69,7 +69,7 @@ if __name__ == "__main__":
         dataset = load_dataset(args.dataset_name)    
 
 
-    num_proc = torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count() > 1 else None
+    num_proc = torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count() >= 1 else None
 
     updated_dataset = dataset.map(
         filter_stems,
