@@ -12,7 +12,7 @@ if __name__ == "__main__":
     
     parser.add_argument("dataset_name", type=str, help="Path or name of the dataset. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/loading_methods#datasets.load_dataset.path")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use, if necessary.")
-    parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dataset on disk with this path.")
+    parser.add_argument("--output_dir", default=None, type=str, help="If specified, save the dataset on disk with this path.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the dataset to the hub.")
     parser.add_argument("--audio_column_name", default="audio", type=str, help="Column name of the audio column to be enriched.")
     parser.add_argument("--text_column_name", default="text", type=str, help="Text column name.")
@@ -71,9 +71,9 @@ if __name__ == "__main__":
         dataset[split] = pitch_dataset[split].add_column("snr", snr_dataset[split]["snr"]).add_column("c50", snr_dataset[split]["c50"])
         dataset[split] = dataset[split].add_column("speaking_rate", rate_dataset[split]["speaking_rate"]).add_column("phonemes", rate_dataset[split]["phonemes"])
     
-    if args.dump_folder_path:
+    if args.output_dir:
         print("Saving to disk...")
-        dataset.save_to_disk(args.dump_folder_path)
+        dataset.save_to_disk(args.output_dir)
     if args.repo_id:
         print("Pushing to the hub...")
         if args.configuration:

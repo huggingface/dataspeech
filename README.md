@@ -46,7 +46,7 @@ To use it, you need a dataset from the [datasets](https://huggingface.co/docs/da
 ```sh
 python main.py "blabble-io/libritts_r" \
 --configuration "dev" \
---dump_folder_path ./tmp_libritts_r_dev/ \
+--output_dir ./tmp_libritts_r_dev/ \
 --text_column_name "text_normalized" \
 --audio_column_name "audio" \
 --cpu_num_workers 8 \
@@ -89,7 +89,7 @@ The next step is to map the continuous annotations from the previous steps to ke
 ```sh
 python ./scripts/metadata_to_text.py "ylacombe/libritts_r_tags+ylacombe/libritts_r_tags" \
 --configuration "clean+other" \
---dump_folder_path "./tmp_tts_clean+./tmp_tts_other" \
+--output_dir "./tmp_tts_clean+./tmp_tts_other" \
 --cpu_num_workers "8" \
 --leading_split_for_bins "train" \
 --plot_directory "./plots/" \

@@ -12,7 +12,7 @@ if __name__ == "__main__":
     parser.add_argument("dataset_name", type=str, help="Repo id or local path.")
     parser.add_argument("tsv_path", default=None, type=str, help="Text column name.")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use.")
-    parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dasaset on disk.")
+    parser.add_argument("--output_dir", default=None, type=str, help="If specified, save the dasaset on disk.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
     parser.add_argument("--speaker_id_column_name", default="speaker_id", type=str, help="Audio column name.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers for transformations that don't use GPUs or if no GPU are available.")
@@ -39,8 +39,8 @@ if __name__ == "__main__":
     dataset = dataset.map(map_gender, batched=True, batch_size=128, input_columns=speaker_id_column_name, num_proc=args.cpu_num_workers)
 
     
-    if args.dump_folder_path:
-        dataset.save_to_disk(args.dump_folder_path)
+    if args.output_dir:
+        dataset.save_to_disk(args.output_dir)
     if args.repo_id:
         if args.configuration:
             dataset.push_to_hub(args.repo_id, args.configuration)

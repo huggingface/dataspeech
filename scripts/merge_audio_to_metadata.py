@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("dataset_name", type=str, help="Repo id.")
     parser.add_argument("metadata_dataset_name", type=str, help="Repo id.")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use.")
-    parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dasaset on disk.")
+    parser.add_argument("--output_dir", default=None, type=str, help="If specified, save the dasaset on disk.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers.")
     parser.add_argument("--strategy", default="concatenate", type=str, help="For now only concatenate.")
@@ -52,8 +52,8 @@ if __name__ == "__main__":
             raise ValueError(f"Concatenate didn't work. Some ids don't correspond on split {split}")
     
 
-    if args.dump_folder_path:
-        dataset.save_to_disk(args.dump_folder_path)
+    if args.output_dir:
+        dataset.save_to_disk(args.output_dir)
     if args.repo_id:
         if args.configuration:
             dataset.push_to_hub(args.repo_id, args.configuration)

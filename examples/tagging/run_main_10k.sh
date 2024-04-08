@@ -2,7 +2,7 @@
 
 python main.py "blabble-io/libritts_r" \
     --configuration "clean" \
-    --dump_folder_path ./tmp_libritts_r_clean/ \
+    --output_dir ./tmp_libritts_r_clean/ \
     --text_column_name "text_normalized" \
     --audio_column_name "audio" \
     --cpu_num_workers 32 \
@@ -12,7 +12,7 @@ python main.py "blabble-io/libritts_r" \
 
 python main.py "blabble-io/libritts_r" \
     --configuration "other" \
-    --dump_folder_path ./tmp_libritts_r_other/ \
+    --output_dir ./tmp_libritts_r_other/ \
     --text_column_name "text_normalized" \
     --audio_column_name "audio" \
     --cpu_num_workers 32 \
@@ -21,7 +21,7 @@ python main.py "blabble-io/libritts_r" \
     --repo_id "ylacombe/libritts_r_tags"\
 
 python main.py "parler-tts/mls_eng_10k" \
-    --dump_folder_path ./tmp_mls_eng_10k/ \
+    --output_dir ./tmp_mls_eng_10k/ \
     --text_column_name "transcript" \
     --audio_column_name "audio" \
     --cpu_num_workers 32 \

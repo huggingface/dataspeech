@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset_name", type=str, help="Path or name of the dataset. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/loading_methods#datasets.load_dataset.path")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use, if necessary.")
-    parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dataset on disk with this path.")
+    parser.add_argument("--output_dir", default=None, type=str, help="If specified, save the dataset on disk with this path.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the model to the hub.")
     parser.add_argument("--audio_column_name", default="audio", type=str, help="Column name of the audio column to be separated.")
     parser.add_argument("--batch_size", default=8, type=int, help="Batch size. Speeds up operations on GPU.")
@@ -82,9 +82,9 @@ if __name__ == "__main__":
     updated_dataset = updated_dataset.cast_column("vocals", Audio())
     updated_dataset = updated_dataset.cast_column("others", Audio())
     
-    if args.dump_folder_path:
+    if args.output_dir:
         print("Saving to disk...")
-        updated_dataset.save_to_disk(args.dump_folder_path)
+        updated_dataset.save_to_disk(args.output_dir)
     if args.repo_id:
         print("Pushing to the hub...")
         if args.configuration:

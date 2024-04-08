@@ -123,7 +123,7 @@ if __name__ == "__main__":
     
     parser.add_argument("dataset_name", type=str, help="Path or name of the dataset(s). If multiple datasets, names have to be separated by `+`.")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration(s) to use (or configuration separated by +).")
-    parser.add_argument("--dump_folder_path", default=None, type=str, help="If specified, save the dataset(s) on disk. If multiple datasets, paths have to be separated by `+`.")
+    parser.add_argument("--output_dir", default=None, type=str, help="If specified, save the dataset(s) on disk. If multiple datasets, paths have to be separated by `+`.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the dataset(s) to the hub. If multiple datasets, names have to be separated by `+`.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers.")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size in `Dataset.map` operations. https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/main_classes#datasets.Dataset.map")
@@ -139,7 +139,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    dump_folder_paths = [args.dump_folder_path] if args.dump_folder_path is not None else None
+    output_dirs = [args.output_dir] if args.output_dir is not None else None
     repo_ids = [args.repo_id] if args.repo_id is not None else None
     if args.configuration:
         if "+" in args.dataset_name:
@@ -153,10 +153,10 @@ if __name__ == "__main__":
                 if len(dataset_names) != len(repo_ids):
                     raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(repo_ids)} repository ids spotted")
 
-            if args.dump_folder_path is not None:
-                dump_folder_paths = args.dump_folder_path.split("+")
-                if len(dataset_names) != len(dump_folder_paths):
-                    raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(dump_folder_paths)} local paths on which to save the datasets spotted")
+            if args.output_dir is not None:
+                output_dirs = args.output_dir.split("+")
+                if len(dataset_names) != len(output_dirs):
+                    raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(output_dirs)} local paths on which to save the datasets spotted")
             
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
@@ -173,10 +173,10 @@ if __name__ == "__main__":
                 if len(dataset_names) != len(repo_ids):
                     raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(repo_ids)} repository ids spotted")
 
-            if args.dump_folder_path is not None:
-                dump_folder_paths = args.dump_folder_path.split("+")
-                if len(dataset_names) != len(dump_folder_paths):
-                    raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(dump_folder_paths)} local paths on which to save the datasets spotted")
+            if args.output_dir is not None:
+                output_dirs = args.output_dir.split("+")
+                if len(dataset_names) != len(output_dirs):
+                    raise ValueError(f"There are {len(dataset_names)} datasets spotted but {len(output_dirs)} local paths on which to save the datasets spotted")
             
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names):
@@ -195,9 +195,9 @@ if __name__ == "__main__":
     dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.reverberation_std_tolerance, save_dir=args.plot_directory)
     dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speech_monotony_std_tolerance, save_dir=args.plot_directory)
 
-    if args.dump_folder_path:
-        for dump_folder_path, df in zip(dump_folder_paths, dataset):
-            df.save_to_disk(dump_folder_path)
+    if args.output_dir:
+        for output_dir, df in zip(output_dirs, dataset):
+            df.save_to_disk(output_dir)
     if args.repo_id:
         for i, (repo_id, df) in enumerate(zip(repo_ids, dataset)):
             if args.configuration:
