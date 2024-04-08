@@ -1,12 +1,12 @@
 # Data-Speech
 
-Data-Speech is a suite of utility scripts designed to enrich audio speech datasets. 
+Data-Speech is a suite of utility scripts designed to tag speech datasets. 
 
-Its aim is to provide a simple, clean code base for applying audio transformations or annotations that may be requested as part of the development of speech-based AI models.
+Its aim is to provide a simple, clean codebase for applying audio transformations (or annotations) that may be requested as part of the development of speech-based AI models, such as text-to-speech engines.
 
-Its primary use is to reproduce the annotation method from [Dan Lyth and Simon King's research paper (`Natural language guidance of high-fidelity text-to-speech with synthetic annotations`)](https://arxiv.org/abs/2402.01912) that allows to label various speaker characteristics with natural language description.
+Its primary use is to reproduce the annotation method from Dan Lyth and Simon King's research paper [Natural language guidance of high-fidelity text-to-speech with synthetic annotations](https://arxiv.org/abs/2402.01912), that labels various speaker characteristics with natural language descriptions.
 
-This allows us to already tag and release enriched versions of [LibriTTS-R](https://huggingface.co/datasets/blabble-io/libritts_r) and a 10K hours subset of [the English version of MLS](https://www.openslr.org/94/). Datasets can be found [here](https://huggingface.co/parler-tts).
+Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](tagged dataset), and a 10K hours subset of [the English version of MLS](tagged dataset). The resulting datasets were used to train [Parler-TTS](tagged repo), a new text-to-speech model.
 
 
 ---------
@@ -24,31 +24,30 @@ pip install -r requirements.txt
 ## Use-cases
 
 Current use-cases covers:
-- [Annotate an audio speech dataset using `main.py`](#generate-annotations) to get the following continuous variables:
+- [Annotate a speech dataset](#predict-annotations) to get the following continuous variables:
     - Speaking rate `(nb_phonemes / utterance_length)`
-    - Speech-to-noise ratio (SNR)
+    - Signal-to-noise ratio (SNR)
     - Reverberation
     - Pitch estimation
-- [Map the previous annotations categorical to discrete keywords bins using `scripts/metadata_to_text.py`](#map-continuous-annotations-to-key-words)
-- [Create natural language descriptions from a set of keywords using `scripts/run_prompt_creation.py`](#generate-natural-language-descriptions)
+- [Map the previous annotations categorical to discrete keywords bins](#map-continuous-annotations-to-key-words)
+- [Create natural language descriptions from a set of keywords](#generate-natural-language-descriptions)
 
-Moreover, additional scripts cover other use-cases such as:
-- [perform audio separation](#perform-audio-separation) using [demucs](https://github.com/adefossez/demucs) in a multi-GPU settings
-- add gender information to [MLS](https://www.openslr.org/94/) and [LibriTTS-R](https://huggingface.co/datasets/blabble-io/libritts_r).
-- more to come...
+In the following examples, we'll load 1,000 hours of labelled audio data from the Libri TTS-R dataset and add annotations 
+using the dataspeech library. The resulting dataset is complete with discrete annotation tags, as well as a coherent audio
+description of the spoken audio characteristics.
 
 > [!TIP]
 > Scripts from this library can also be used as a starting point for applying other models to datasets from the [datasets library](https://huggingface.co/docs/datasets/v2.17.0/en/index) in a multi-machine configuration.
 > 
 > For example, `scripts/run_prompt_creation.py` can be adapted to perform large-scaled inference using other LLMs and prompts.
 
-### Generate annotations
+### 1. Predict annotations
 
 For the time being, [`main.py`](main.py) can be used to generate speaking rate, SNR, reverberation and pitch estimation.
 
 To use it, you need a dataset from the [datasets](https://huggingface.co/docs/datasets/v2.17.0/en/index) library, either locally or on the [hub](https://huggingface.co/datasets).
 
-For example, let's use it on the [450-samples midlands male split of the English dialect dataset](https://huggingface.co/datasets/ylacombe/english_dialects/viewer/midlands_male).
+For example, let's use it on the [450-samples midlands male split of the English dialect dataset](https://huggingface.co/datasets/ylacombe/english_dialects/viewer/midlands_male):
 
 ```sh
 python main.py "ylacombe/english_dialects" \
@@ -83,11 +82,11 @@ The dataset viewer gives an idea of what has been done, namely:
 ![image](https://github.com/ylacombe/dataspeech/assets/52246514/f422a728-f2af-4c8f-bf2a-65c6722bc0c6)
 
 
-### Map continuous annotations to key-words
+### 2. Map continuous annotations to key-words
 
 The next step is to map the continuous annotations from the previous steps to key-words. To do so, continous annotations are mapped to categorical bins that are then associated to key-words. For example, the speaking rate can be associated to 7 text bins which are: `"very slowly", "quite slowly", "slightly slowly", "moderate speed", "slightly fast", "quite fast", "very fast"`.
 
-This step is more subtile than the previous one, as we generally want to collect a wide variety of speech data to compute accurate key-words.
+This step is more subtle than the previous one, as we generally want to collect a wide variety of speech data to compute accurate key-words.
 
 Indeed, some datasets, such as LibriTTS-R, collect data from only one or a few sources; for LibriTTS-R, these are audiobooks, and the process of collecting or processing the data can result in homogeneous data that can vary. In the case of LibriTTS-R, the data has been cleaned to have little noise, little reverberation, and the audiobooks collected leaves little variety in intonation.
 
@@ -117,7 +116,7 @@ python main.py --help
 Note that default tolerances for extreme values can also be modified by passing the desired value to the following arguments: `pitch_std_tolerance`, `speaking_rate_std_tolerance`, `snr_std_tolerance`, `reverberation_std_tolerance`, `speech_monotony_std_tolerance`.
 
 
-### Generate natural language descriptions
+### 3. Generate natural language descriptions
 
 Now that we have text bins associated to our datasets, the next step is to create natural language descriptions out of the few created features.
 
@@ -131,31 +130,26 @@ python run_prompt_creation.py \
   --dataset_config_name "clean" \
   --dataset_split_name "dev.clean" \
   --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
-  --per_device_eval_batch_size 2 \
+  --per_device_eval_batch_size 16 \
   --attn_implementation "sdpa" \
   --dataloader_num_workers 0 \
   --output_dir "./" \
   --load_in_4bit
 ```
 
-As usual, we precise the dataset name and configuration we want to enrich. Here, you can also specify a single split, if necessary.
-`model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of the famous Mistral 7B model.
-
+As usual, we precise the dataset name and configuration we want to annotate. Here, you can also specify a single split, if necessary.
+`model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model.
 
 The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains two more examples that scale the recipe to respectively 1K and 10K hours of data.
 
 > [!CAUTION]
 > This step generally demands more resources and times and should use one or many GPUs. 
 
-### Perform audio separation
-
-[`scripts/filter_audio_separation.py`](/scripts/filter_audio_separation.py) is useful to scale-up audio separation, namely separating audio stems.
-In the speech case, it can be used to remove musical and/or noisy background from speech. This script uses [`demucs`].
-
-
 ## Acknowledgements
 
 This library builds on top of a number of open-source giants, to whom we'd like to extend our warmest thanks for providing these tools!
+
+TODO(YL): bullet point acknowledgements (Stability paper, Dan Lyth, Datasets, + all other models that we use), add citation for Stability paper as well?
 
 ## Status
 This library is still a WIP. Other utility scripts should come soon.
