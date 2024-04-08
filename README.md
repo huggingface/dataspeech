@@ -90,8 +90,18 @@ python main.py --help
 
 In addition to the command line used as an example, we've used the `repo_id` argument to push the dataset to the hub, resulting in [this dataset](https://huggingface.co/datasets/ylacombe/example_process_dataset).
 
+The dataset viewer gives an idea of what has been done, namely:
+- new columns were added:
+    - `utterance_pitch_std`: Gives a measure of the standard deviation of pitch in the utterance.
+    - `utterance_pitch_mean`: Gives a measure of average pitch in the utterance.
+    - `snr`: Speech-to-noise ratio
+    - `c50`: Reverberation estimation
+    - `speaking_rate`
+    - `phonemes`: which was used to compute the speaking rate
+- the audio column was removed - this is especially useful when dealing with big datasets, as writing and pushing audio data can become a bottleneck.
 
-TODO
+![image](https://github.com/ylacombe/dataspeech/assets/52246514/f422a728-f2af-4c8f-bf2a-65c6722bc0c6)
+
 
 ### Map continuous annotations to key-words
 
