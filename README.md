@@ -159,7 +159,7 @@ Special thanks to:
 ## Citation
 ```
 @misc{lacombe-etal-2024-dataspeech,
-  author = {Yoach Lacombe and Sanchit Gandhi and Vaibhav Srivastav},
+  author = {Yoach Lacombe and Vaibhav Srivastav and Sanchit Gandhi},
   title = {Data-Speech},
   year = {2024},
   publisher = {GitHub},
