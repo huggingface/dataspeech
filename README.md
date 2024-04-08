@@ -33,12 +33,12 @@ Current use-cases covers:
 - [Create natural language descriptions from a set of keywords using `scripts/run_prompt_creation.py`](#generate-natural-language-descriptions)
 
 Moreover, additional scripts cover other use-cases such as:
-- [perform audio separation](#perform-audio-separation) using [demucs](TODO) in a multi-GPU settings
-- add gender information to [MLS](TODO) and [LibriTTS-R](TODO).
+- [perform audio separation](#perform-audio-separation) using [demucs](https://github.com/adefossez/demucs) in a multi-GPU settings
+- add gender information to [MLS](https://www.openslr.org/94/) and [LibriTTS-R](https://huggingface.co/datasets/blabble-io/libritts_r).
 - more to come...
 
 > [!TIP]
-> Scripts from this library can also be used as a starting point for applying other models to datasets from the [datasets library](TODO) in a multi-machine configuration.
+> Scripts from this library can also be used as a starting point for applying other models to datasets from the [datasets library](https://huggingface.co/docs/datasets/v2.17.0/en/index) in a multi-machine configuration.
 > 
 > For example, `scripts/run_prompt_creation.py` can be adapted to perform large-scaled inference using other LLMs and prompts.
 
@@ -121,7 +121,7 @@ Note that default tolerances for extreme values can also be modified by passing 
 
 Now that we have text bins associated to our datasets, the next step is to create natural language descriptions out of the few created features.
 
-[`scripts/run_prompt_creation.py`](/scripts/run_prompt_creation.py) relies on [`accelerate`](#TODO) and [`transformers`](#TODO) to generate natural language descriptions from LLMs.
+[`scripts/run_prompt_creation.py`](/scripts/run_prompt_creation.py) relies on [`accelerate`](https://huggingface.co/docs/accelerate/index) and [`transformers`](https://huggingface.co/docs/transformers/index) to generate natural language descriptions from LLMs.
 
 [`examples/prompt_creation/run_prompt_creation_dummy.sh`](examples/prompt_creation/run_prompt_creation_dummy.sh) contains a dummy example to get you ready:
 
