@@ -20,13 +20,14 @@ if __name__ == "__main__":
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers for transformations that don't use GPUs or if no GPU are available.")
     parser.add_argument("--cpu_writer_batch_size", default=1000, type=int, help="writer_batch_size for transformations that don't use GPUs. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/main_classes#datasets.Dataset.map.writer_batch_size")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size when relevant, useful when operations can be performed in batch.")
+    parser.add_argument("--num_workers_per_gpu", default=1, type=int, help="Number of workers per GPU for transformations that uses GPUs if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
 
     args = parser.parse_args()
     
     if args.configuration:
-        dataset = load_dataset(args.dataset_name, args.configuration)
+        dataset = load_dataset(args.dataset_name, args.configuration, num_proc=args.cpu_num_workers,)
     else:
-        dataset = load_dataset(args.dataset_name)
+        dataset = load_dataset(args.dataset_name, num_proc=args.cpu_num_workers,)
         
     audio_column_name = "audio" if args.rename_column else args.audio_column_name
     text_column_name = "text" if args.rename_column else args.text_column_name
@@ -50,7 +51,7 @@ if __name__ == "__main__":
         batched=True,
         batch_size=args.batch_size,
         with_rank=True if torch.cuda.device_count()>0 else False,
-        num_proc=torch.cuda.device_count() if torch.cuda.device_count()>0 else args.cpu_num_workers,
+        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count()>0 else args.cpu_num_workers,
         remove_columns=[audio_column_name], # tricks to avoid rewritting audio
         fn_kwargs={"audio_column_name": audio_column_name},
     )
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         batched=True,
         batch_size=args.batch_size,
         with_rank=True if torch.cuda.device_count()>0 else False,
-        num_proc=torch.cuda.device_count() if torch.cuda.device_count()>0 else args.cpu_num_workers,
+        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count()>0 else args.cpu_num_workers,
         remove_columns=[audio_column_name], # tricks to avoid rewritting audio
         fn_kwargs={"audio_column_name": audio_column_name},
     )
