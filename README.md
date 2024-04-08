@@ -6,7 +6,7 @@ Its aim is to provide a simple, clean codebase for applying audio transformation
 
 Its primary use is to reproduce the annotation method from Dan Lyth and Simon King's research paper [Natural language guidance of high-fidelity text-to-speech with synthetic annotations](https://arxiv.org/abs/2402.01912), that labels various speaker characteristics with natural language descriptions.
 
-Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](https://huggingface.co/datasets/blabble-io/libritts_r). and a 10K hours subset of [the English version of MLS](https://www.openslr.org/94/). Datasets can be found [here](https://huggingface.co/parler-tts).  # TODO(YL): I would replace the hyperlinks here with the direct hyper-links to the tagged dataset on the Hub
+Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](tagged dataset), and a 10K hours subset of [the English version of MLS](tagged dataset). The resulting datasets were used to train [Parler-TTS](tagged repo), a new text-to-speech model.
 
 
 ---------
