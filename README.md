@@ -157,6 +157,7 @@ Special thanks to:
 - and the many libraries used, namely [datasets](https://huggingface.co/docs/datasets/v2.17.0/en/index), [brouhaha](https://github.com/marianne-m/brouhaha-vad/blob/main/README.md), [penn](https://github.com/interactiveaudiolab/penn/blob/master/README.md), [g2p](https://github.com/Kyubyong/g2p), [accelerate](https://huggingface.co/docs/accelerate/en/index) and [transformers](https://huggingface.co/docs/transformers/index).
 
 ## Citation
+```
 @misc{lacombe-etal-2024-dataspeech,
   author = {Yoach Lacombe and Sanchit Gandhi and Vaibhav Srivastav},
   title = {Data-Speech},
@@ -165,6 +166,7 @@ Special thanks to:
   journal = {GitHub repository},
   howpublished = {\url{https://github.com/ylacombe/dataspeech}}
 }
+```
 
 ## Status
 This library is still a WIP. Other utility scripts should come soon.
