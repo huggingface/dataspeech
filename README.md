@@ -157,6 +157,9 @@ Special thanks to:
 - and the many libraries used, namely [datasets](https://huggingface.co/docs/datasets/v2.17.0/en/index), [brouhaha](https://github.com/marianne-m/brouhaha-vad/blob/main/README.md), [penn](https://github.com/interactiveaudiolab/penn/blob/master/README.md), [g2p](https://github.com/Kyubyong/g2p), [accelerate](https://huggingface.co/docs/accelerate/en/index) and [transformers](https://huggingface.co/docs/transformers/index).
 
 ## Citation
+
+If you found this repository useful, please consider citing this work and also the original Stability AI paper:
+
 ```
 @misc{lacombe-etal-2024-dataspeech,
   author = {Yoach Lacombe and Vaibhav Srivastav and Sanchit Gandhi},
@@ -165,6 +168,17 @@ Special thanks to:
   publisher = {GitHub},
   journal = {GitHub repository},
   howpublished = {\url{https://github.com/ylacombe/dataspeech}}
+}
+```
+
+```
+@misc{lyth2024natural,
+      title={Natural language guidance of high-fidelity text-to-speech with synthetic annotations},
+      author={Dan Lyth and Simon King},
+      year={2024},
+      eprint={2402.01912},
+      archivePrefix={arXiv},
+      primaryClass={cs.SD}
 }
 ```
 
