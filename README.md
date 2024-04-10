@@ -6,7 +6,9 @@ Its aim is to provide a simple, clean codebase for applying audio transformation
 
 Its primary use is to reproduce the annotation method from Dan Lyth and Simon King's research paper [Natural language guidance of high-fidelity text-to-speech with synthetic annotations](https://arxiv.org/abs/2402.01912), that labels various speaker characteristics with natural language descriptions.
 
-Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts_r_tags_tagged_10k_generated), and a 10K hours subset of [the English version of MLS](https://huggingface.co/datasets/parler-tts/mls-eng-10k-tags_tagged_10k_generated). The resulting datasets were used to train [Parler-TTS](https://github.com/huggingface/parler-tts), a new text-to-speech model.
+Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts_r_tags_tagged_10k_generated), and a 10K hours subset of [the English version of MLS](https://huggingface.co/datasets/parler-tts/mls-eng-10k-tags_tagged_10k_generated).
+
+This repository is designed to accompany the [Parler-TTS library](https://github.com/huggingface/parler-tts), which contains the inference and training code for Parler-TTS, a new family of high-quality text-to-speech models.
 
 ---------
 
