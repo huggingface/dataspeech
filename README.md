@@ -18,13 +18,13 @@ description of the spoken audio characteristics.
 
 
 There are 3 steps to be completed in order to generate annotations:
-- [1. Annotate the speech dataset](#predict-annotations) to get the following continuous variables:
+1. [Annotate the speech dataset](#predict-annotations) to get the following continuous variables:
     - Speaking rate `(nb_phonemes / utterance_length)`
     - Signal-to-noise ratio (SNR)
     - Reverberation
     - Pitch estimation
-- [2. Map the previous annotations categorical to discrete keywords bins](#map-continuous-annotations-to-key-words)
-- [3. Create natural language descriptions from a set of keywords](#generate-natural-language-descriptions)
+2. [Map the previous annotations categorical to discrete keywords bins](#map-continuous-annotations-to-key-words)
+3. [Create natural language descriptions from a set of keywords](#generate-natural-language-descriptions)
 
 
 ## Set-up
