@@ -16,34 +16,41 @@ UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "slightly monotone", "
 SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "slightly low pitch", "moderate pitch", "slightly high pitch", "quite high pitch", "very high pitch"]
 
 
-def visualize_bins_to_text(hist, filtered_hist, text_bins, save_dir, output_column_name):
+def visualize_bins_to_text(values_1, values_2, name_1, name_2, text_bins, save_dir, output_column_name, default_bins=100):
     # Save both histograms into a single figure
-    plt.figure(figsize=(8,6))
-    plt.suptitle('Before & After Standard Deviation Tolerance')
-    axes = plt.gca().yaxis
-    axes.grid(alpha=.3)
+    fig, axs = plt.subplots(2, figsize=(8,6), sharex=True)
+    
+    # Plot histogram and vertical lines for subplot 1
+    axs[0].hist(values_1, bins=default_bins, color='blue', alpha=0.7)
+    _, bin_edges1 = np.histogram(values_1, bins=len(text_bins))
+    for edge in bin_edges1:
+        axs[0].axvline(x=edge, color='red', linestyle='--', linewidth=1)
 
 
-    plt.subplot(2, 1, 1)
-    plt.bar(range(len(hist)), hist, color='blue', alpha=0.7)
-    plt.title('Original Distribution')
-    plt.yticks(fontsize=9)
-    plt.yscale("log")
-    plt.xticks([r for r in range(len(hist))], text_bins, fontsize=5)
+    # Plot histogram and vertical lines for subplot 2
+    axs[1].hist(values_2, bins=50, color='green', alpha=0.7)
+    _, bin_edges2 = np.histogram(values_2, bins=len(text_bins))
+    for edge in bin_edges2:
+        axs[1].axvline(x=edge, color='red', linestyle='--', linewidth=1)
 
-    plt.subplot(2, 1, 2)
-    plt.bar(range(len(filtered_hist)), filtered_hist, color='red', alpha=0.7)
-    plt.title('Filtered Distribution')
-    plt.yticks(fontsize=9)
-    plt.yscale("log")
-    plt.xticks([r for r in range(len(filtered_hist))], text_bins, fontsize=5)
+    # Add labels and title
+    axs[0].set_title(name_1)
+    axs[1].set_title(name_2)
+    axs[0].set_yscale('log')
+    axs[1].set_yscale('log')
+    axs[0].set_ylabel('Frequency')
+    axs[1].set_ylabel('Frequency')
+    axs[1].set_xlabel(f'{output_column_name}')
 
-    filename = f"{output_column_name}_before_after_sd_threshold.png"
+    # Adjust layout
+    plt.tight_layout()
+
+    filename = f"{output_column_name}.png"
     filepath = os.path.join(save_dir, filename)
     plt.savefig(filepath)
     print(f"Plots saved at '{filename}'!")
 
-def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1, std_tolerance=5, save_dir=None):
+def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1, std_tolerance=5, save_dir=None, only_save_plot=False):
     '''
     Compute bins of `column_name` from the splits `leading_split_for_bins` and apply text bins to every split.
     `leading_split_for_bins` can be a string or a list.
@@ -56,14 +63,22 @@ def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_sp
     
     # filter out outliers
     values = np.array(values)
-    original_hist, _ = np.histogram(values, bins = len(text_bins))
     if std_tolerance is not None:
-        values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
+        filtered_values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
 
-    hist, bin_edges = np.histogram(values, bins = len(text_bins))
     if save_dir is not None:
-        visualize_bins_to_text(original_hist, hist, text_bins, save_dir, output_column_name)
+        visualize_bins_to_text(values, filtered_values, "Before filtering", "After filtering", text_bins, save_dir, output_column_name)
+        
+    # speaking_rate can easily have outliers
+    if save_dir is not None and output_column_name=="speaking_rate":
+        visualize_bins_to_text(filtered_values, filtered_values, "After filtering", "After filtering", text_bins, save_dir, f"{output_column_name}_after_filtering")
+
+    if only_save_plot:
+        return dataset
     
+    values = filtered_values
+    hist, bin_edges = np.histogram(values, bins = len(text_bins))
+
     def batch_association(batch):
         index_bins = np.searchsorted(bin_edges, batch, side="left")
         # do min(max(...)) when values are outside of the main bins
@@ -76,7 +91,7 @@ def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_sp
     dataset = [df.map(batch_association, batched=True, batch_size=batch_size, input_columns=[column_name], num_proc=num_workers) for df in dataset]
     return dataset
 
-def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, gender_column_name, column_name, output_column_name, batch_size = 4, num_workers=1, std_tolerance=None):
+def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, gender_column_name, column_name, output_column_name, batch_size = 4, num_workers=1, std_tolerance=None, save_dir=None, only_save_plot=False):
     '''
     Computes mean values on a speaker level and computes bins on top relative to the gender column name.
     Then associate a text bin to the column.
@@ -92,14 +107,28 @@ def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, ge
     dataframe = dataframe.groupby(speaker_column_name).agg({column_name: "mean", gender_column_name: "first"})
     
     bin_edges = {}
+    if save_dir is not None:
+        save_dict = {}
+        save_dict_afer_filtering = {}
     for category in ["male", "female"]:
         values = dataframe[dataframe[gender_column_name] == category][column_name]
         values = np.array(values)
+        if save_dir is not None:
+            save_dict[category] = values
         if std_tolerance is not None:
             # filter out outliers
             values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
+            if save_dir is not None:
+                save_dict_afer_filtering[category] = values
         bin_edges[category] = np.histogram(values, len(text_bins))[1]
         
+    if save_dir is not None:
+        visualize_bins_to_text(save_dict["male"], save_dict["female"], "Male distribution", "Female distribution", text_bins, save_dir, output_column_name)
+        if std_tolerance is not None:
+            visualize_bins_to_text(save_dict_afer_filtering["male"], save_dict_afer_filtering["female"], "Male distribution", "Female distribution", text_bins, save_dir, f"{output_column_name}_after_filtering")
+
+    if only_save_plot:
+        return dataset
     # 
     speaker_id_to_bins = dataframe.apply(lambda x: np.searchsorted(bin_edges[x[gender_column_name]], x[column_name]), axis=1).to_dict()
         
@@ -136,8 +165,12 @@ if __name__ == "__main__":
     parser.add_argument("--speech_monotony_std_tolerance", default=4, type=float, help="Standard deviation tolerance for speech monotony estimation. Any value that is outside mean ± std * tolerance is discared.")
     parser.add_argument("--leading_split_for_bins", default=None, type=str, help="If specified, will use every split that contains it to compute statistics. If not specified, will use every split.")
     parser.add_argument("--plot_directory", default=None, type=str, help="If specified, will save visualizing plots to this directory.")
+    parser.add_argument("--only_save_plot", default=False, type=bool, help="If `True` and `--plot_directory` is specified, will only compute plot.")
 
     args = parser.parse_args()
+    
+    if args.plot_directory is None and args.only_save_plot:
+        raise ValueError("`only_save_plot=True` but `plot_directory` is not specified. Please give a path to the directory where you want the plot to be saved.")
     
     output_dirs = [args.output_dir] if args.output_dir is not None else None
     repo_ids = [args.repo_id] if args.repo_id is not None else None
@@ -161,6 +194,9 @@ if __name__ == "__main__":
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
                 tmp_dataset = load_dataset(dataset_name, dataset_config)
+                if dataset_name == "ylacombe/jenny-tts-tags": # TODO: remove this part
+                    tmp_dataset["train"] = tmp_dataset["train"].add_column("speaker_id", [9999999]* len(tmp_dataset["train"]))
+                    tmp_dataset["train"] = tmp_dataset["train"].add_column("gender", ["female"]* len(tmp_dataset["train"]))
                 dataset.append(tmp_dataset)
         else:
             dataset = [load_dataset(args.dataset_name, args.configuration)]
@@ -189,18 +225,19 @@ if __name__ == "__main__":
     if args.plot_directory:
         Path(args.plot_directory).mkdir(parents=True, exist_ok=True)
     
-    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, args.speaker_id_column_name, args.gender_column_name, "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=args.pitch_std_tolerance)
-    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speaking_rate_std_tolerance, save_dir=args.plot_directory)
-    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.snr_std_tolerance, save_dir=args.plot_directory)
-    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.reverberation_std_tolerance, save_dir=args.plot_directory)
-    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speech_monotony_std_tolerance, save_dir=args.plot_directory)
+    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, args.speaker_id_column_name, args.gender_column_name, "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=args.pitch_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speaking_rate_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.snr_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.reverberation_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speech_monotony_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
 
-    if args.output_dir:
-        for output_dir, df in zip(output_dirs, dataset):
-            df.save_to_disk(output_dir)
-    if args.repo_id:
-        for i, (repo_id, df) in enumerate(zip(repo_ids, dataset)):
-            if args.configuration:
-                df.push_to_hub(repo_id, dataset_configs[i])
-            else:
-                df.push_to_hub(repo_id)
+    if not args.only_save_plot:
+        if args.output_dir:
+            for output_dir, df in zip(output_dirs, dataset):
+                df.save_to_disk(output_dir)
+        if args.repo_id:
+            for i, (repo_id, df) in enumerate(zip(repo_ids, dataset)):
+                if args.configuration:
+                    df.push_to_hub(repo_id, dataset_configs[i])
+                else:
+                    df.push_to_hub(repo_id)
