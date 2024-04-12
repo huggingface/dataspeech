@@ -19,8 +19,11 @@ if __name__ == "__main__":
     parser.add_argument("--rename_column", action="store_true", help="If activated, rename audio and text column names to 'audio' and 'text'. Useful if you want to merge datasets afterwards.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers for transformations that don't use GPUs or if no GPU are available.")
     parser.add_argument("--cpu_writer_batch_size", default=1000, type=int, help="writer_batch_size for transformations that don't use GPUs. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/main_classes#datasets.Dataset.map.writer_batch_size")
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size when relevant, useful when operations can be performed in batch. For now, only useful for pitch estimation.")
-    parser.add_argument("--num_workers_per_gpu", default=1, type=int, help="Number of workers per GPU for transformations that uses GPUs if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
+    parser.add_argument("--batch_size", default=2, type=int, help="This parameters specify how many samples are passed by workers for operations that are using GPUs.")
+    parser.add_argument("--penn_batch_size", default=4096, type=int, help="Pitch estimation chunks audio into smaller pieces and processes them in batch. This specify the batch size. If you are using a gpu, pick a batch size that doesn't cause memory errors.")
+    parser.add_argument("--num_workers_per_gpu_for_pitch", default=1, type=int, help="Number of workers per GPU for the pitch estimation if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
+    parser.add_argument("--num_workers_per_gpu_for_snr", default=1, type=int, help="Number of workers per GPU for the SNR and reverberation estimation if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
+
 
     args = parser.parse_args()
     
@@ -34,6 +37,27 @@ if __name__ == "__main__":
     if args.rename_column:
         dataset = dataset.rename_columns({args.audio_column_name: "audio", args.text_column_name: "text"})
 
+    print("Compute pitch")
+    pitch_dataset = dataset.map(
+        pitch_apply,
+        batched=True,
+        batch_size=args.batch_size,
+        with_rank=True if torch.cuda.device_count()>0 else False,
+        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu_for_pitch if torch.cuda.device_count()>0 else args.cpu_num_workers,
+        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+        fn_kwargs={"audio_column_name": audio_column_name, "penn_batch_size": args.penn_batch_size},
+    )
+
+    print("Compute snr and reverb")
+    snr_dataset = dataset.map(
+        snr_apply,
+        batched=True,
+        batch_size=args.batch_size,
+        with_rank=True if torch.cuda.device_count()>0 else False,
+        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu_for_snr if torch.cuda.device_count()>0 else args.cpu_num_workers,
+        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+        fn_kwargs={"audio_column_name": audio_column_name},
+    )
     
     print("Compute speaking rate")
     rate_dataset = dataset.map(
@@ -43,28 +67,6 @@ if __name__ == "__main__":
         writer_batch_size= args.cpu_writer_batch_size,
         remove_columns=[audio_column_name], # tricks to avoid rewritting audio
         fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
-    )
-
-    print("Compute snr and reverb")
-    snr_dataset = dataset.map(
-        snr_apply,
-        batched=True,
-        batch_size=args.batch_size,
-        with_rank=True if torch.cuda.device_count()>0 else False,
-        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count()>0 else args.cpu_num_workers,
-        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
-        fn_kwargs={"audio_column_name": audio_column_name},
-    )
-    
-    print("Compute pitch")
-    pitch_dataset = dataset.map(
-        pitch_apply,
-        batched=True,
-        batch_size=args.batch_size,
-        with_rank=True if torch.cuda.device_count()>0 else False,
-        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu if torch.cuda.device_count()>0 else args.cpu_num_workers,
-        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
-        fn_kwargs={"audio_column_name": audio_column_name},
     )
     
     for split in dataset.keys():

@@ -9,10 +9,6 @@ hopsize = .01
 fmin = 30.
 fmax = 1000.
 
-# If you are using a gpu, pick a batch size that doesn't cause memory errors
-# on your gpu
-batch_size = 4096
-
 # Select a checkpoint to use for inference. Selecting None will
 # download and use FCNF0++ pretrained on MDB-stem-synth and PTDB
 checkpoint = None
@@ -24,7 +20,7 @@ center = 'half-hop'
 interp_unvoiced_at = .065
 
 
-def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name="utterance_pitch"):
+def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name="utterance_pitch", penn_batch_size=4096):
     if isinstance(batch[audio_column_name], list):  
         utterance_pitch_mean = []
         utterance_pitch_std = []
@@ -37,7 +33,7 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
                 fmin=fmin,
                 fmax=fmax,
                 checkpoint=checkpoint,
-                batch_size=batch_size,
+                batch_size=penn_batch_size,
                 center=center,
                 interp_unvoiced_at=interp_unvoiced_at,
                 gpu=(rank or 0)% torch.cuda.device_count() if rank else rank
@@ -56,7 +52,7 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
                 fmin=fmin,
                 fmax=fmax,
                 checkpoint=checkpoint,
-                batch_size=batch_size,
+                batch_size=penn_batch_size,
                 center=center,
                 interp_unvoiced_at=interp_unvoiced_at,
                 gpu=(rank or 0)% torch.cuda.device_count() if rank else rank
