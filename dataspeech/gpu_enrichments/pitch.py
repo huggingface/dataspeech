@@ -39,8 +39,8 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
                 gpu=(rank or 0)% torch.cuda.device_count() if rank else rank
                 )
             
-            utterance_pitch_mean.append(pitch.mean())
-            utterance_pitch_std.append(pitch.std())
+            utterance_pitch_mean.append(pitch.mean().cpu())
+            utterance_pitch_std.append(pitch.std().cpu())
             
         batch[f"{output_column_name}_mean"] = utterance_pitch_mean 
         batch[f"{output_column_name}_std"] = utterance_pitch_std 
@@ -57,7 +57,7 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
                 interp_unvoiced_at=interp_unvoiced_at,
                 gpu=(rank or 0)% torch.cuda.device_count() if rank else rank
                 )        
-        batch[f"{output_column_name}_mean"] = pitch.mean()
-        batch[f"{output_column_name}_std"] = pitch.std()
+        batch[f"{output_column_name}_mean"] = pitch.mean().cpu()
+        batch[f"{output_column_name}_std"] = pitch.std().cpu()
 
     return batch
