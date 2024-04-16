@@ -209,21 +209,26 @@ class DataCollatorWithPadding:
 
 
 # TODO(SG): add accent keyword
-PROMPT = """You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
+PROMPT = """
+You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
 1. The gender (e.g., male, female)
-2. The level of reverberation (e.g., very roomy sounding, quite roomy sounding, slightly roomy sounding, moderate reverberation, slightly confined sounding, quite confined sounding, very confined sounding)
-3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, moderate ambient sound, slightly clear, quite clear, very clear)
-4. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderate intonation, slightly expressive, quite expressive, very expressive)
+2. The level of reverberation (e.g., very distant-sounding, quite distant-sounding, slightly distant-sounding, moderately balanced reverberation, slightly close-sounding, quite close-sounding, very close-sounding)
+3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, balanced in clarity, slightly clean, quite clean, very clean)
+4. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderately dynamic, slightly expressive and animated, quite expressive and animated, very expressive and animated)
 5. The pace of the speaker's delivery (e.g., very slowly, quite slowly, slightly slowly, moderate speed, slightly fast, quite fast, very fast)
-6. The pitch of the speaker's voice (e.g., very low pitch, quite low pitch, slightly low pitch, moderate pitch, slightly high pitch, quite high pitch, very high pitch)
+6. The pitch of the speaker's voice (e.g., very low-pitch, quite low-pitch, slightly low-pitch, moderate pitch, slightly high-pitch, quite high-pitch, very high-pitch)
 
-Your task is to create a text description using these keywords that accurately describes the speech sample while ensuring the description remains grammatically correct and easy to understand. You should rearrange the keyword order as necessary, and substitute synonymous terms where appropriate. If the amount of noise is 'very noisy' and the level of reverberation is 'very roomy sounding', include terms like 'very bad recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very confined sounding', include terms like 'very good recording' in the description. Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
+Your task is to create a text description using these keywords that accurately describes the speech sample while ensuring the description remains grammatically correct and easy to understand. 
+You can optionally change the order of keywords, and replace synonymous terms. You can also optionally omit the following terms, as they are default terms: `moderately balanced reverberation`, `balanced in clarity`, `moderately dynamic`, `moderate speed` and `moderate pitch`.
+If the amount of noise is 'very noisy' and the level of reverberation is 'distant-sounding', you must include words such as "very poor recording" in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very close-sounding', you must include terms like 'very good recording' in the description. 
+Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
 
-For example, given the following keywords: 'female', 'slightly roomy sounding', 'slightly noisy', 'very expressive', 'slightly low pitch', 'very slowly', a valid description would be: 'a woman with a deep voice speaks slowly but has an animated delivery in an echoey room with some background noise'.
+For example, given the following keywords: 'female', 'slightly distant-souding', 'slightly noisy', 'very expressive', 'moderate pitch', 'very slowly', a valid description would be: 'A woman with a moderately pitched voice speaks very slowly but has an animated delivery in an echoey room with some background noise'.
+Another valid description would be: `In a room with slight background noise, a female speaker delivers an animated and expressive speech,at a very slow pace.`
+Another valid description would be: `A female voice enunciates an animated and expressive speech. Her voice is slightly distant-sounding, with some background noise present. She speaks very slowly with a moderate pitch but a very expressive tone.`
 
-For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:"
+For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:
 """
-
 
 def main():
     # 1. Parse input arguments

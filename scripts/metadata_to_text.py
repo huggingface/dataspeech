@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 import os
 import matplotlib.pyplot as plt
+import json
 
 SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "slightly slowly", "moderate speed", "slightly fast", "quite fast", "very fast"]
 SNR_BINS = ["very noisy", "quite noisy", "slightly noisy", "moderate ambient sound", "slightly clear", "quite clear", "very clear"]
@@ -16,20 +17,20 @@ UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "slightly monotone", "
 SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "slightly low pitch", "moderate pitch", "slightly high pitch", "quite high pitch", "very high pitch"]
 
 
-def visualize_bins_to_text(values_1, values_2, name_1, name_2, text_bins, save_dir, output_column_name, default_bins=100):
+def visualize_bins_to_text(values_1, values_2, name_1, name_2, text_bins, save_dir, output_column_name, default_bins=100, lower_range=None):
     # Save both histograms into a single figure
     fig, axs = plt.subplots(2, figsize=(8,6), sharex=True)
     
     # Plot histogram and vertical lines for subplot 1
     axs[0].hist(values_1, bins=default_bins, color='blue', alpha=0.7)
-    _, bin_edges1 = np.histogram(values_1, bins=len(text_bins))
+    _, bin_edges1 = np.histogram(values_1, bins=len(text_bins), range=(lower_range, values_1.max()) if lower_range else None)
     for edge in bin_edges1:
         axs[0].axvline(x=edge, color='red', linestyle='--', linewidth=1)
 
 
     # Plot histogram and vertical lines for subplot 2
     axs[1].hist(values_2, bins=50, color='green', alpha=0.7)
-    _, bin_edges2 = np.histogram(values_2, bins=len(text_bins))
+    _, bin_edges2 = np.histogram(values_2, bins=len(text_bins), range=(lower_range, values_2.max()) if lower_range else None)
     for edge in bin_edges2:
         axs[1].axvline(x=edge, color='red', linestyle='--', linewidth=1)
 
@@ -50,7 +51,7 @@ def visualize_bins_to_text(values_1, values_2, name_1, name_2, text_bins, save_d
     plt.savefig(filepath)
     print(f"Plots saved at '{filename}'!")
 
-def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1, std_tolerance=5, save_dir=None, only_save_plot=False):
+def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_split_for_bins="train", batch_size = 4, num_workers = 1, std_tolerance=5, save_dir=None, only_save_plot=False, lower_range=None):
     '''
     Compute bins of `column_name` from the splits `leading_split_for_bins` and apply text bins to every split.
     `leading_split_for_bins` can be a string or a list.
@@ -67,17 +68,17 @@ def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_sp
         filtered_values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
 
     if save_dir is not None:
-        visualize_bins_to_text(values, filtered_values, "Before filtering", "After filtering", text_bins, save_dir, output_column_name)
+        visualize_bins_to_text(values, filtered_values, "Before filtering", "After filtering", text_bins, save_dir, output_column_name, lower_range)
         
     # speaking_rate can easily have outliers
     if save_dir is not None and output_column_name=="speaking_rate":
-        visualize_bins_to_text(filtered_values, filtered_values, "After filtering", "After filtering", text_bins, save_dir, f"{output_column_name}_after_filtering")
+        visualize_bins_to_text(filtered_values, filtered_values, "After filtering", "After filtering", text_bins, save_dir, f"{output_column_name}_after_filtering", lower_range)
 
     if only_save_plot:
         return dataset
     
     values = filtered_values
-    hist, bin_edges = np.histogram(values, bins = len(text_bins))
+    hist, bin_edges = np.histogram(values, bins = len(text_bins), range=(lower_range, values.max()) if lower_range else None)
 
     def batch_association(batch):
         index_bins = np.searchsorted(bin_edges, batch, side="left")
@@ -166,11 +167,24 @@ if __name__ == "__main__":
     parser.add_argument("--leading_split_for_bins", default=None, type=str, help="If specified, will use every split that contains it to compute statistics. If not specified, will use every split.")
     parser.add_argument("--plot_directory", default=None, type=str, help="If specified, will save visualizing plots to this directory.")
     parser.add_argument("--only_save_plot", default=False, type=bool, help="If `True` and `--plot_directory` is specified, will only compute plot.")
+    parser.add_argument("--text_bins_path", default=None, type=str, help="If specified, points to a JSON file which contains the text bins desired. By default, will use default bins.")
+    parser.add_argument("--snr_lower_range", default=50, type=float, help="The lower range of the SNR bins")
 
     args = parser.parse_args()
     
     if args.plot_directory is None and args.only_save_plot:
         raise ValueError("`only_save_plot=True` but `plot_directory` is not specified. Please give a path to the directory where you want the plot to be saved.")
+    
+    text_bins_dict = {}
+    if args.text_bins_path:
+        with open(args.text_bins_path) as json_file:
+            text_bins_dict = json.load(json_file)
+
+    speaker_level_pitch_bins = text_bins_dict.get("speaker_level_pitch_bins", SPEAKER_LEVEL_PITCH_BINS)
+    speaker_rate_bins = text_bins_dict.get("speaker_rate_bins", SPEAKER_RATE_BINS)
+    snr_bins = text_bins_dict.get("snr_bins", SNR_BINS)
+    reverberation_bins = text_bins_dict.get("reverberation_bins", REVERBERATION_BINS)
+    utterance_level_std = text_bins_dict.get("utterance_level_std", UTTERANCE_LEVEL_STD)
     
     output_dirs = [args.output_dir] if args.output_dir is not None else None
     repo_ids = [args.repo_id] if args.repo_id is not None else None
@@ -194,9 +208,6 @@ if __name__ == "__main__":
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
                 tmp_dataset = load_dataset(dataset_name, dataset_config)
-                if dataset_name == "ylacombe/jenny-tts-tags": # TODO: remove this part
-                    tmp_dataset["train"] = tmp_dataset["train"].add_column("speaker_id", [9999999]* len(tmp_dataset["train"]))
-                    tmp_dataset["train"] = tmp_dataset["train"].add_column("gender", ["female"]* len(tmp_dataset["train"]))
                 dataset.append(tmp_dataset)
         else:
             dataset = [load_dataset(args.dataset_name, args.configuration)]
@@ -225,11 +236,11 @@ if __name__ == "__main__":
     if args.plot_directory:
         Path(args.plot_directory).mkdir(parents=True, exist_ok=True)
     
-    dataset = speaker_level_relative_to_gender(dataset, SPEAKER_LEVEL_PITCH_BINS, args.speaker_id_column_name, args.gender_column_name, "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=args.pitch_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
-    dataset = bins_to_text(dataset, SPEAKER_RATE_BINS, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speaking_rate_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
-    dataset = bins_to_text(dataset, SNR_BINS, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.snr_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
-    dataset = bins_to_text(dataset, REVERBERATION_BINS, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.reverberation_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
-    dataset = bins_to_text(dataset, UTTERANCE_LEVEL_STD, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speech_monotony_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = speaker_level_relative_to_gender(dataset, speaker_level_pitch_bins, args.speaker_id_column_name, args.gender_column_name, "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=args.pitch_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, speaker_rate_bins, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speaking_rate_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, snr_bins, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.snr_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, lower_range=args.snr_lower_range)
+    dataset = bins_to_text(dataset, reverberation_bins, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.reverberation_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
+    dataset = bins_to_text(dataset, utterance_level_std, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speech_monotony_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot)
 
     if not args.only_save_plot:
         if args.output_dir:
