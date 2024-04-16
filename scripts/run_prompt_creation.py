@@ -96,6 +96,9 @@ class ModelArguments:
     compile_generate: Optional[bool] = field(
         default=False, metadata={"help": "Whether to compile the forward pass (not sampling) in generate."}
     )
+    precompute_prompt_past_key_values: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to precompute the common prompt past key values to speed-up generating process."}
+    )
 
 
 @dataclass
@@ -209,8 +212,7 @@ class DataCollatorWithPadding:
 
 
 # TODO(SG): add accent keyword
-PROMPT = """
-You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
+COMMON_PROMPT = """You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
 1. The gender (e.g., male, female)
 2. The level of reverberation (e.g., very distant-sounding, quite distant-sounding, slightly distant-sounding, moderately balanced reverberation, slightly close-sounding, quite close-sounding, very close-sounding)
 3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, balanced in clarity, slightly clean, quite clean, very clean)
@@ -226,9 +228,9 @@ Otherwise, do not add extra details beyond what has been provided, and only retu
 For example, given the following keywords: 'female', 'slightly distant-souding', 'slightly noisy', 'very expressive', 'moderate pitch', 'very slowly', a valid description would be: 'A woman with a moderately pitched voice speaks very slowly but has an animated delivery in an echoey room with some background noise'.
 Another valid description would be: `In a room with slight background noise, a female speaker delivers an animated and expressive speech,at a very slow pace.`
 Another valid description would be: `A female voice enunciates an animated and expressive speech. Her voice is slightly distant-sounding, with some background noise present. She speaks very slowly with a moderate pitch but a very expressive tone.`
-
-For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:
 """
+
+PERSONNALIZED_PART_PROMPT = """For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:"""
 
 def main():
     # 1. Parse input arguments
@@ -247,6 +249,9 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
+
+    if model_args.precompute_prompt_past_key_values and model_args.attn_implementation == "flash_attention_2":
+        raise ValueError("Precompute_prompt_past_key_values=True is not compatible with flash attention 2 because the latter needs left padding (bc of Mistral) while the former needs right padding. You can use `sdpa` instead.")
 
     accelerator = Accelerator()
 
@@ -339,14 +344,21 @@ def main():
         revision=model_args.model_revision,
         trust_remote_code=model_args.trust_remote_code,
         use_fast=model_args.use_fast_tokenizer,
-        padding_side="left",
+        padding_side="left" if not model_args.precompute_prompt_past_key_values else "right",
     )
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.bos_token_id
         model.generation_config.pad_token_id = model.generation_config.eos_token_id
+        
+    past_key_values = None
+    if model_args.precompute_prompt_past_key_values:
+        # remove last 4 tokens that are added by template and tokenizer
+        prompt_token_ids = tokenizer.apply_chat_template([{"role": "user", "content": COMMON_PROMPT}], return_tensors="pt")[:, :-4]
+        with torch.no_grad():
+            past_key_values = model(input_ids=prompt_token_ids.repeat((model_args.per_device_eval_batch_size, 1)).to(model.device), use_cache=True)[1]
 
     def prepare_dataset(sample):
-        sample_prompt = PROMPT
+        sample_prompt = COMMON_PROMPT + PERSONNALIZED_PART_PROMPT
         for key in EXPECTED_COLUMNS:
             sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
         sample_prompt = [{"role": "user", "content": sample_prompt}]
@@ -359,14 +371,13 @@ def main():
             prepare_dataset, num_proc=data_args.preprocessing_num_workers, desc="Preparing prompts"
         )
 
-    # Prepare everything with our `accelerator`
-    model = accelerator.prepare(model)
     data_collator = DataCollatorWithPadding(tokenizer)
-
+    
     def generate_step(batch):
-        output_ids = accelerator.unwrap_model(model).generate(
+        output_ids = model.generate(
             batch["input_ids"],
             attention_mask=batch["attention_mask"],
+            past_key_values=past_key_values,
             do_sample=model_args.do_sample,
             temperature=model_args.temperature,
             max_new_tokens=model_args.max_new_tokens,
