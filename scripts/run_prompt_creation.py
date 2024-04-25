@@ -93,8 +93,10 @@ class ModelArguments:
     max_new_tokens: Optional[int] = field(
         default=256, metadata={"help": "Maximum number of new tokens during generation"}
     )
-    compile_generate: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to compile the forward pass (not sampling) in generate."}
+    torch_compile: Optional[bool] = field(
+        default=False, metadata={
+            "help": "Whether to compile the forward pass (not sampling) in generate. Only compatible with Gemma and LlaMA."
+        }
     )
 
 
@@ -308,26 +310,16 @@ def main():
         token=model_args.token,
     ).eval()
 
-    if model_args.compile_generate:
+    if model_args.torch_compile:
+        # torch compile only compatible with gemma and llama
         if not callable(getattr(model, "_setup_cache", None)):
             raise ValueError(
-                f"Static k/v cache is not compatible with the model {model.__class__.__name__}. Set `--compile_generate=False"
+                f"Static k/v cache is not compatible with the model {model.__class__.__name__}. Set `--torch_compile=False"
                 "for dynamic k/v cache"
             )
         model.generation_config.cache_implementation = "static"
-        model._forward = model.forward
-        compiled_forward = torch.compile(model.forward)
-
-        def compiled(func, input_ids, **kwargs):
-            return func(input_ids, **kwargs)
-
-        def call(input_ids, **kwargs):
-            if input_ids.shape[-1] == 1:
-                return compiled(compiled_forward, input_ids, **kwargs)
-
-            return model._forward(input_ids, **kwargs)
-
-        model.forward = call
+        # compile the forward pass (but not the top-{p,k} sampling)
+        model = torch.compile(model, mode="reduce-overhead", fullgraph=True)
 
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
