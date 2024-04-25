@@ -6,6 +6,7 @@ from typing import Optional
 
 import logging
 from datasets import DatasetDict, load_dataset
+from tqdm import tqdm
 from transformers import (
     AutoTokenizer,
     HfArgumentParser,
@@ -127,6 +128,12 @@ class DataArguments:
             "help": "Overwrite the content of the output directory each time the script is run."
         },
     )
+    checkpoint_interval: Optional[int] = field(
+        default=1000,
+        metadata={
+            "help": "Interval for streaming chunks of generation."
+        },
+    )
 
     def __post_init__(self):
         if self.push_to_hub and self.hub_dataset_id is None:
@@ -205,7 +212,7 @@ with LLMSwarm(
 
     async def main():
         # 2. Setup logging
-        # Make one log on every process with the configuration for debugging.
+        logger.setLevel(logging.INFO)
         logging.basicConfig(
             format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
             datefmt="%m/%d/%Y %H:%M:%S",
@@ -262,11 +269,21 @@ with LLMSwarm(
             )
 
         for split in raw_datasets:
-            results = await tqdm_asyncio.gather(
-                *(process_text(sample) for sample in raw_datasets[split])
-            )
+            all_results = []
+            total_samples = len(raw_datasets[split])
+            for idx in range(0, total_samples, data_args.checkpoint_interval):
+                end_index = min(idx + data_args.checkpoint_interval, total_samples)
+                inference_chunk = raw_datasets[split].select(range(idx, end_index))
+                results = await tqdm_asyncio.gather(
+                    *(process_text(sample) for sample in inference_chunk),
+                    total=total_samples,
+                    initial=idx,
+                    desc=f"Split {split}"
+                )
+                logger.info(f"Saving transcriptions of step {idx}")
+                all_results.extend(results)
             raw_datasets[split] = raw_datasets[split].add_column(
-                "text_description", results
+                "text_description", all_results
             )
 
         raw_datasets.save_to_disk(data_args.output_dir)
