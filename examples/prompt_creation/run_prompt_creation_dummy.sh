@@ -8,6 +8,10 @@ python run_prompt_creation.py \
   --per_device_eval_batch_size 2 \
   --attn_implementation "sdpa" \
   --torch_compile \
-  --max_eval_samples 8 \
+  --max_eval_samples 128 \
+  --max_new_tokens 4 \
   --dataloader_num_workers 0 \
-  --output_dir "./"
+  --save_steps 32 \
+  --save_total_limit 2 \
+  --output_dir "./" \
+  --do_sample False
