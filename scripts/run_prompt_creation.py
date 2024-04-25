@@ -6,7 +6,7 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -98,9 +98,10 @@ class ModelArguments:
         default=256, metadata={"help": "Maximum number of new tokens during generation"}
     )
     torch_compile: Optional[bool] = field(
-        default=False, metadata={
+        default=False,
+        metadata={
             "help": "Whether to compile the forward pass (not sampling) in generate. Only compatible with Gemma and LlaMA."
-        }
+        },
     )
 
 
@@ -165,13 +166,9 @@ class DataArguments:
         metadata={"help": "Save the generated prompts every save_steps."},
     )
     save_total_limit: Optional[int] = field(
-        default=1,
-        metadata={
-            "help": (
-                "If a value is passed, will limit the total number of saved checkpoints"
-            )
-        }
+        default=1, metadata={"help": ("If a value is passed, will limit the total number of saved checkpoints")}
     )
+
     def __post_init__(self):
         if self.push_to_hub and self.hub_dataset_id is None:
             raise ValueError("You must specify the `hub_dataset_id` when setting `--push_to_hub=True`")
@@ -208,8 +205,10 @@ def get_kbit_device_map() -> Union[Dict[str, int], None]:
     """Useful for running inference with quantized models by setting `device_map=get_peft_device_map()`"""
     return {"": get_current_device()} if torch.cuda.is_available() else None
 
+
 CHECKPOINT_PREFIX = "checkpoint"
 _RE_CHECKPOINT = re.compile(r"^checkpoint-(\d+).json$")
+
 
 def save_checkpoint(output_dir, all_generated_ids, step):
     checkpoint_path = f"{CHECKPOINT_PREFIX}-{step}.json"
@@ -218,11 +217,13 @@ def save_checkpoint(output_dir, all_generated_ids, step):
     with open(output_path, "w") as file:
         json.dump(all_generated_ids, file)
 
+
 def load_checkpoint(checkpoint_path):
     with open(checkpoint_path, "r") as file:
         all_generated_ids = json.load(file)
     all_generated_ids = [np.array(lst) for lst in all_generated_ids]
     return all_generated_ids
+
 
 def sorted_checkpoints(output_dir=None) -> List[str]:
     """Helper function to sort saved checkpoints from oldest to newest."""
@@ -254,6 +255,7 @@ def rotate_checkpoints(save_total_limit=None, output_dir=None) -> None:
     for checkpoint in checkpoints_to_be_deleted:
         logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
         os.remove(checkpoint)
+
 
 def get_last_checkpoint(folder) -> Tuple[List, int]:
     if not os.path.exists(folder) or not os.path.isdir(folder):
