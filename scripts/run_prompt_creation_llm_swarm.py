@@ -31,9 +31,19 @@ class ModelArguments:
             "help": "The name of the model to use (via the transformers library) for the prompt annotation."
         },
     )
+    num_instances: int = field(
+        default=1,
+        metadata={"help": "Number of TGI instances."},
+    )
     per_instance_max_parallel_requests: int = field(
         default=500,
         metadata={"help": "Maximum number of parallel requests per instance."},
+    )
+    checkpoint_interval: Optional[int] = field(
+        default=1000,
+        metadata={
+            "help": "Interval for streaming chunks of generation."
+        },
     )
     model_revision: str = field(
         default="main",
@@ -65,6 +75,14 @@ class ModelArguments:
     debug_endpoint: Optional[str] = field(
         default=None,
         metadata={"help": "Endpoint to use for debugging (e.g. http://localhost:13120)."},
+    )
+    max_retries: Optional[int] = field(
+        default=5,
+        metadata={"help": "Maximum number of retries per sample."},
+    )
+    retry_delay_in_s: Optional[float] = field(
+        default=5.0,
+        metadata={"help": "Time to wait between successive retries in seconds."},
     )
 
 
@@ -128,12 +146,6 @@ class DataArguments:
             "help": "Overwrite the content of the output directory each time the script is run."
         },
     )
-    checkpoint_interval: Optional[int] = field(
-        default=1000,
-        metadata={
-            "help": "Interval for streaming chunks of generation."
-        },
-    )
 
     def __post_init__(self):
         if self.push_to_hub and self.hub_dataset_id is None:
@@ -181,7 +193,7 @@ else:
 
 with LLMSwarm(
     LLMSwarmConfig(
-        instances=1,
+        instances=model_args.num_instances,
         inference_engine="tgi",
         slurm_template_path="./tgi_h100.template.slurm",
         load_balancer_template_path="./nginx.template.conf",
@@ -191,6 +203,7 @@ with LLMSwarm(
         debug_endpoint=model_args.debug_endpoint,
     )
 ) as llm_swarm:
+    semaphore = asyncio.Semaphore(llm_swarm.suggested_max_parallel_requests)
     client = AsyncInferenceClient(model=llm_swarm.endpoint)
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
@@ -203,12 +216,27 @@ with LLMSwarm(
             sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
         sample_prompt = [{"role": "user", "content": sample_prompt}]
         sample_prompt = tokenizer.apply_chat_template(sample_prompt, tokenize=False)
-        return await client.text_generation(
-            prompt=sample_prompt,
-            max_new_tokens=model_args.max_new_tokens,
-            temperature=model_args.temperature,
-            do_sample=model_args.do_sample,
-        )
+        attempt = 0
+        while attempt < model_args.max_retries:
+            try:
+                async with semaphore:
+                    return await client.text_generation(
+                        prompt=sample_prompt,
+                        max_new_tokens=model_args.max_new_tokens,
+                        temperature=model_args.temperature,
+                        do_sample=model_args.do_sample,
+                    )
+            except Exception as e:
+                attempt += 1
+                if attempt < data_args.max_retries:
+                    print(
+                        f"Request failed due to {e}, retrying in {data_args.retry_delay_in_s} seconds... (Attempt {attempt}/{data_args.max_retries})"
+                    )
+                    await asyncio.sleep(data_args.retry_delay_in_s)
+                else:
+                    raise ValueError(
+                        f"Max retries reached. Failed with error: {e}."
+                    )
 
     async def main():
         # 2. Setup logging
@@ -271,8 +299,8 @@ with LLMSwarm(
         for split in raw_datasets:
             all_results = []
             total_samples = len(raw_datasets[split])
-            for idx in range(0, total_samples, data_args.checkpoint_interval):
-                end_index = min(idx + data_args.checkpoint_interval, total_samples)
+            for idx in range(0, total_samples, model_args.checkpoint_interval):
+                end_index = min(idx + model_args.checkpoint_interval, total_samples)
                 inference_chunk = raw_datasets[split].select(range(idx, end_index))
                 results = await tqdm_asyncio.gather(
                     *(process_text(sample) for sample in inference_chunk),
@@ -280,7 +308,6 @@ with LLMSwarm(
                     initial=idx,
                     desc=f"Split {split}"
                 )
-                logger.info(f"Saving transcriptions of step {idx}")
                 all_results.extend(results)
             raw_datasets[split] = raw_datasets[split].add_column(
                 "text_description", all_results
