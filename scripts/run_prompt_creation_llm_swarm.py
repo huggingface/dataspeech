@@ -1,10 +1,16 @@
+import json
 import os
+import re
 import shutil
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Tuple, List
 
 import logging
+
+import math
+import numpy as np
 from datasets import DatasetDict, load_dataset
 from tqdm import tqdm
 from transformers import (
@@ -146,12 +152,85 @@ class DataArguments:
             "help": "Overwrite the content of the output directory each time the script is run."
         },
     )
+    save_steps: Optional[int] = field(
+        default=500,
+        metadata={"help": "Save the generated prompts every save_steps."},
+    )
+    save_total_limit: Optional[int] = field(
+        default=1, metadata={"help": ("If a value is passed, will limit the total number of saved checkpoints")}
+    )
 
     def __post_init__(self):
         if self.push_to_hub and self.hub_dataset_id is None:
             raise ValueError(
                 "You must specify the `hub_dataset_id` when setting `--push_to_hub=True`"
             )
+
+CHECKPOINT_PREFIX = "checkpoint"
+_RE_CHECKPOINT = re.compile(r"^checkpoint-(\d+).json$")
+
+
+def save_checkpoint(output_dir, all_generated_ids, step):
+    checkpoint_path = f"{CHECKPOINT_PREFIX}-{step}.json"
+    output_path = os.path.join(output_dir, checkpoint_path)
+    with open(output_path, "w") as file:
+        json.dump(all_generated_ids, file)
+
+
+def load_checkpoint(checkpoint_path):
+    with open(checkpoint_path, "r") as file:
+        all_generated_ids = json.load(file)
+    return all_generated_ids
+
+
+def sorted_checkpoints(output_dir=None) -> List[str]:
+    """Helper function to sort saved checkpoints from oldest to newest."""
+    ordering_and_checkpoint_path = []
+
+    glob_checkpoints = [str(x) for x in Path(output_dir).glob(f"{CHECKPOINT_PREFIX}-*")]
+
+    for path in glob_checkpoints:
+        regex_match = re.match(f".*{CHECKPOINT_PREFIX}-([0-9]+)", path)
+        if regex_match is not None and regex_match.groups() is not None:
+            ordering_and_checkpoint_path.append((int(regex_match.groups()[0]), path))
+
+    checkpoints_sorted = sorted(ordering_and_checkpoint_path)
+    checkpoints_sorted = [checkpoint[1] for checkpoint in checkpoints_sorted]
+    return checkpoints_sorted
+
+
+def rotate_checkpoints(save_total_limit=None, output_dir=None) -> None:
+    """Helper function to delete old checkpoints."""
+    if save_total_limit is None or save_total_limit <= 0:
+        return
+    # Check if we should delete older checkpoint(s)
+    checkpoints_sorted = sorted_checkpoints(output_dir=output_dir)
+    if len(checkpoints_sorted) <= save_total_limit:
+        return
+
+    number_of_checkpoints_to_delete = max(0, len(checkpoints_sorted) - save_total_limit)
+    checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
+    for checkpoint in checkpoints_to_be_deleted:
+        logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
+        os.remove(checkpoint)
+
+
+def get_last_checkpoint(folder) -> Tuple[List, int]:
+    if not os.path.exists(folder) or not os.path.isdir(folder):
+        os.makedirs(folder, exist_ok=True)
+        return [], 0
+    content = os.listdir(folder)
+    checkpoints = [path for path in content if _RE_CHECKPOINT.search(path) is not None]
+    if len(checkpoints) == 0:
+        return [], 0
+    last_checkpoint = os.path.join(folder, max(checkpoints, key=lambda x: int(_RE_CHECKPOINT.search(x).groups()[0])))
+    # Find num steps saved state string pattern
+    pattern = r"checkpoint-(\d+).json"
+    match = re.search(pattern, last_checkpoint)
+    cur_step = int(match.group(1))
+    # load corresponding generated ids
+    all_generated_ids = load_checkpoint(last_checkpoint)
+    return all_generated_ids, cur_step
 
 
 # TODO(SG): add accent
@@ -297,20 +376,30 @@ with LLMSwarm(
             )
 
         for split in raw_datasets:
-            all_results = []
             total_samples = len(raw_datasets[split])
-            for idx in range(0, total_samples, model_args.checkpoint_interval):
-                end_index = min(idx + model_args.checkpoint_interval, total_samples)
-                inference_chunk = raw_datasets[split].select(range(idx, end_index))
-                results = await tqdm_asyncio.gather(
-                    *(process_text(sample) for sample in inference_chunk),
-                    total=total_samples,
-                    initial=idx,
-                    desc=f"Split {split}"
+            total_inference_steps = math.ceil(total_samples/ model_args.checkpoint_interval)
+
+            split_output_dir = os.path.join(data_args.output_dir, split)
+            progress_bar = tqdm(range(total_inference_steps), desc=f"{split}", position=0)
+
+            all_generated_ids, cur_step = get_last_checkpoint(split_output_dir)
+
+            for inference_step in range(cur_step, total_inference_steps):
+                start_index = inference_step * model_args.checkpoint_interval
+                end_index = min((inference_step + 1) * model_args.checkpoint_interval, total_samples + 1)
+                inference_chunk = raw_datasets[split].select(range(start_index, end_index))
+                results = await asyncio.gather(
+                    *(process_text(sample) for sample in inference_chunk)
                 )
-                all_results.extend(results)
+                progress_bar.update(1)
+                all_generated_ids.extend(results)
+
+                if (inference_step % data_args.save_steps == 0) or (inference_step == total_inference_steps):
+                    save_checkpoint(split_output_dir, all_generated_ids, cur_step)
+                    rotate_checkpoints(data_args.save_total_limit, output_dir=split_output_dir)
+
             raw_datasets[split] = raw_datasets[split].add_column(
-                "text_description", all_results
+                "text_description", all_generated_ids
             )
 
         raw_datasets.save_to_disk(data_args.output_dir)
