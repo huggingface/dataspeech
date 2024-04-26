@@ -32,6 +32,98 @@ pip install -r requirements.txt
 
 ## Annotating datasets to fine-tune Parler-TTS
 
+In the following examples, we'll load 30 hours of audio data from the [Jenny TTS dataset](https://github.com/dioco-group/jenny-tts-dataset), a high-quality mono-speaker TTS dataset, from an Irish female speaker named Jenny.
+
+The aim here is to create an annotated version of Jenny TTS, in order to fine-tune the [Parler-TTS v0.1 checkpoint](https://huggingface.co/parler-tts/parler_tts_mini_v0.1) on this dataset.
+
+Thanks to a [script similar to what's described in the FAQ](#how-do-i-use-datasets-that-i-have-with-this-repository), we've uploaded the dataset to the HuggingFace hub, under the name [reach-vb/jenny_tts_dataset](https://huggingface.co/datasets/reach-vb/jenny_tts_dataset).
+
+Feel free to follow the link above to listen to some samples of the Jenny TTS dataset thanks to the hub viewer.
+
+> [!IMPORTANT]
+> Refer to the section [Annotating datasets from scratch](#annotating-datasets-from-scratch) for more detailed explanations of what's going on under-the-hood.
+
+We'll:
+1. Annotate the Jenny dataset with continuous variables that measures the speech characteristics
+2. Map those annotations to text bins that characterize the speech characteristics.
+3. Create natural language descriptions from those text bins
+
+### 1. Annotate the Jenny dataset
+
+We'll use [`main.py`](main.py) to get the following continuous variables:
+    - Speaking rate `(nb_phonemes / utterance_length)`
+    - Signal-to-noise ratio (SNR)
+    - Reverberation
+    - Speech monotony
+
+```sh
+python main.py "reach-vb/jenny_tts_dataset" \
+  --configuration "default" \
+  --text_column_name "transcription" \
+  --audio_column_name "audio" \
+  --cpu_num_workers 8 \
+  --rename_column \
+  --repo_id "jenny-tts-tags"
+```
+
+Note that the script will be faster if you have GPUs at your disposal. It will automatically scale-up to every GPUs available in your environnement.
+
+The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was push to [ylacombe/jenny-tts-tags](https://huggingface.co/datasets/ylacombe/jenny-tts-tags).
+
+### 2. Map annotations to text bins
+
+Since the ultimate goal here is to fine-tune the [Parler-TTS v0.1 checkpoint](https://huggingface.co/parler-tts/parler_tts_mini_v0.1) on the Jenny dataset, we want to stay consistent with the text bins of the datasets on which the latter model was trained.
+
+This is easy to do thanks to the following command:
+
+```sh
+python ./scripts/metadata_to_text.py \
+    "ylacombe/jenny-tts-tags" \
+    --repo_id "jenny-tts-tags" \
+    --configuration "default" \
+    --cpu_num_workers "8" \
+    --path_to_bin_edges "./examples/tags_to_annotations/v01_bin_edges.json" \
+    --avoid_pitch_computation
+```
+
+Thanks to [`v01_bin_edges.json`](/examples/tags_to_annotations/v01_bin_edges.json), we don't need to recompute bins from scratch and the above script takes a few seconds.
+
+The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was push to [ylacombe/jenny-tts-tags](https://huggingface.co/datasets/ylacombe/jenny-tts-tags).
+
+You can notice that text bins such as `slightly noisy`, `quite monotone` have been added to the samples.
+
+### 3. Create natural language descriptions from those text bins
+
+Now that we have text bins associated to the Jenny dataset, the next step is to create natural language descriptions out of the few created features.
+
+Here, we decided to create prompts that use the name `Jenny`, prompts that'll look like the following:
+`In a very expressive voice, Jenny pronounces her words incredibly slowly. There's some background noise in this room with a bit of echo'`
+
+This step generally demands more resources and times and should use one or many GPUs.
+
+[`run_prompt_creation_jenny.sh`](examples/prompt_creation/run_prompt_creation_jenny.sh) indicates how to run it on LibriTTS-R:
+
+```sh
+python ./scripts/run_prompt_creation_single_speaker.py \
+  --speaker_name "Jenny" \
+  --dataset_name "ylacombe/jenny-tts-tags" \
+  --dataset_config_name "default" \
+  --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
+  --per_device_eval_batch_size 32 \
+  --attn_implementation "sdpa" \
+  --dataloader_num_workers 8 \
+  --output_dir "./tmp_jenny" \
+  --load_in_4bit \
+  --push_to_hub \
+  --hub_dataset_id "jenny-tts-10k-tagged" \
+  --preprocessing_num_workers 16
+```
+
+As usual, we precise the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model.
+
+> [!NOTE]
+> If you want to use this on a multi-speaker dataset, you'd have to adapt the logic of the script.
+
 
 ## Annotating datasets from scratch
 
@@ -145,7 +237,7 @@ accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_promp
 
 As usual, we precise the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model.
 
-The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains two more examples.
+The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains more examples.
 
 
 > [!TIP]
