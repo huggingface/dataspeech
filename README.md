@@ -132,7 +132,7 @@ accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_promp
   --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated"
 ```
 
-As usual, we precise the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model.
+As usual, we define the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model. If you use a LLaMA or Gemma checkpoint, you can improve throughput by up to 1.5x by adding the flag `--torch_compile` to the arguments.
 
 The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains two more examples.
 
