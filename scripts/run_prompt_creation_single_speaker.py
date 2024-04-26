@@ -346,7 +346,7 @@ def main():
         sample_prompt = PROMPT
         for key in EXPECTED_COLUMNS:
             sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
-        sample_prompt.replace(f"[{speaker_name}]", speaker_name)
+        sample_prompt.replace(f"[speaker_name]", speaker_name)
         sample_prompt = [{"role": "user", "content": sample_prompt}]
         token_ids = tokenizer.apply_chat_template(sample_prompt)
         sample["input_ids"] = token_ids
