@@ -130,7 +130,7 @@ def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, ge
 
     if only_save_plot:
         return dataset
-    # 
+     
     speaker_id_to_bins = dataframe.apply(lambda x: np.searchsorted(bin_edges[x[gender_column_name]], x[column_name]), axis=1).to_dict()
         
     def batch_association(batch):
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--leading_split_for_bins", default=None, type=str, help="If specified, will use every split that contains it to compute statistics. If not specified, will use every split.")
     parser.add_argument("--plot_directory", default=None, type=str, help="If specified, will save visualizing plots to this directory.")
     parser.add_argument("--only_save_plot", default=False, type=bool, help="If `True` and `--plot_directory` is specified, will only compute plot.")
-    parser.add_argument("--text_bins_path", default=None, type=str, help="If specified, points to a JSON file which contains the text bins desired. By default, will use default bins.")
+    parser.add_argument("--path_to_text_bins", default=None, type=str, help="If specified, points to a JSON file which contains the text bins desired. Will use default bins.")
     parser.add_argument("--snr_lower_range", default=50, type=float, help="The lower range of the SNR bins")
 
     args = parser.parse_args()
@@ -176,8 +176,8 @@ if __name__ == "__main__":
         raise ValueError("`only_save_plot=True` but `plot_directory` is not specified. Please give a path to the directory where you want the plot to be saved.")
     
     text_bins_dict = {}
-    if args.text_bins_path:
-        with open(args.text_bins_path) as json_file:
+    if args.path_to_text_bins:
+        with open(args.path_to_text_bins) as json_file:
             text_bins_dict = json.load(json_file)
 
     speaker_level_pitch_bins = text_bins_dict.get("speaker_level_pitch_bins", SPEAKER_LEVEL_PITCH_BINS)
