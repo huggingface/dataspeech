@@ -32,7 +32,7 @@ There are 3 steps to be completed in order to generate annotations:
 You first need to clone this repository before installing requirements.
 
 ```sh
-git clone git@github.com:ylacombe/dataspeech.git
+git clone git@github.com:huggingface/dataspeech.git
 cd dataspeech
 pip install -r requirements.txt
 ```
