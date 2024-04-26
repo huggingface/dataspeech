@@ -12,6 +12,28 @@ This repository is designed to accompany the [Parler-TTS library](https://github
 
 ---------
 
+## 📖 Quick Index
+* [Requirements](#set-up)
+* [Annotating datasets to fine-tune Parler-TTS](#annotating-datasets-to-fine-tune-parler-tts)
+* [Annotating datasets from scratch](#annotating-datasets-from-scratch)
+* [Using Data-Speech to filter your speech datasets](#using-data-speech-to-filter-your-speech-datasets)
+* [❓ FAQ](#faq)
+
+
+## Set-up
+
+You first need to clone this repository before installing requirements.
+
+```sh
+git clone git@github.com:huggingface/dataspeech.git
+cd dataspeech
+pip install -r requirements.txt
+```
+
+## Annotating datasets to fine-tune Parler-TTS
+
+
+## Annotating datasets from scratch
 
 In the following examples, we'll load 1,000 hours of labelled audio data from the [LibriTTS-R dataset](https://huggingface.co/datasets/blabble-io/libritts_r) and add annotations using the dataspeech library. The resulting dataset is complete with discrete annotation tags, as well as a coherent audio
 description of the spoken audio characteristics.
@@ -27,18 +49,7 @@ There are 3 steps to be completed in order to generate annotations:
 3. [Create natural language descriptions from a set of keywords](#generate-natural-language-descriptions)
 
 
-## Set-up
-
-You first need to clone this repository before installing requirements.
-
-```sh
-git clone git@github.com:huggingface/dataspeech.git
-cd dataspeech
-pip install -r requirements.txt
-```
-
-
-## 1. Predict annotations
+### 1. Predict annotations
 
 For the time being, [`main.py`](main.py) can be used to generate speaking rate, SNR, reverberation and pitch estimation. 
 
@@ -79,7 +90,7 @@ The dataset viewer gives an idea of what has been done, namely:
 ![image](https://github.com/ylacombe/dataspeech/assets/52246514/f422a728-f2af-4c8f-bf2a-65c6722bc0c6)
 
 
-## 2. Map continuous annotations to key-words
+### 2. Map continuous annotations to key-words
 
 The next step is to map the continuous annotations from the previous steps to key-words. To do so, continous annotations are mapped to categorical bins that are then associated to key-words. For example, the speaking rate can be associated to 7 text bins which are: `"very slowly", "quite slowly", "slightly slowly", "moderate speed", "slightly fast", "quite fast", "very fast"`.
 
@@ -110,7 +121,7 @@ You can learn more about the arguments you can pass to `main.py` by passing:
 python main.py --help
 ```
 
-## 3. Generate natural language descriptions
+### 3. Generate natural language descriptions
 
 Now that we have text bins associated to our datasets, the next step is to create natural language descriptions out of the few created features.
 
@@ -143,11 +154,55 @@ The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains two
 > For example, `scripts/run_prompt_creation.py` can be adapted to perform large-scaled inference using other LLMs and prompts.
 
 
-## To conclude
+### To conclude
 
 In the [`/examples`](/examples/) folder, we applied this recipe to both [10K hours of MLS Eng](https://huggingface.co/datasets/parler-tts/mls-eng-10k-tags_tagged_10k_generated) and [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts_r_tags_tagged_10k_generated). The resulting datasets were used to train [Parler-TTS](https://github.com/huggingface/parler-tts), a new text-to-speech model.
 
 This recipe is both scalable and easily modifiable and will hopefully help the TTS research community explore new ways of conditionning speech synthesis. 
+
+## Using Data-Speech to filter your speech datasets
+
+While the rest of the README explains how to use this repository to create text descriptions of speech utterances, Data-Speech can also be used to perform filtering on speech datasets.
+
+For example, you can
+1. Use the [`Predict annotations`](#1-predict-annotations) step to predict SNR and reverberation.
+2. Filter your data sets to retain only the most qualitative samples.
+
+You could also, to give more examples, filter on a certain pitch level (e.g only low-pitched voices), or a certain speech rate (e.g only fast speech).
+
+## FAQ
+
+### What kind of datasets do I need?
+
+We rely on the [`datasets`](https://huggingface.co/docs/datasets/v2.17.0/en/index) library, which is optimized for speed and efficiency, and is deeply integrated with the [HuggingFace Hub](https://huggingface.co/datasets) which allows easy sharing and loading.
+
+In order to use this repository, you need a speech dataset from [`datasets`](https://huggingface.co/docs/datasets/v2.17.0/en/index) with at least one audio column and a text transcription column.
+
+### How do I use datasets that I have with this repository?
+
+If you have a local dataset, and want to create a dataset from [`datasets`](https://huggingface.co/docs/datasets/v2.17.0/en/index) to use Data-Speech, you can use the following recipes or refer to the [`dataset` docs](https://huggingface.co/docs/datasets/v2.17.0/en/index) for more complex use-cases.
+
+1. You first need to create a csv file that contains the **full paths** to the audio. The column name for those audio files could be for example `audio`, but you can use whatever you want. You also need a column with the transcriptions of the audio, this column can be named `transcript` but you can use whatever you want.
+
+2. Once you have this csv file, you can load it to a dataset like this:
+```python
+from datasets import DatasetDict
+
+dataset = DatasetDict.from_csv({"train": PATH_TO_CSV_FILE})
+```
+3. You then need to convert the audio column name to [`Audio`](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.Audio) so that `datasets` understand that it deals with audio files.
+```python
+from datasets import Audio
+dataset = dataset.cast_column("audio", Audio())
+```
+4. You can then [push the dataset to the hub](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub):
+```python
+dataset.push_to_hub(REPO_ID)
+```
+
+Note that you can make the dataset private by passing [`private=True`](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub.private) to the [`push_to_hub`](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub) method. Find other possible arguments [here](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub).
+
+When using Data-Speech, you can then use `REPO_ID` (replace this by the name you want here and above) as the dataset name.
 
 
 ## Acknowledgements
