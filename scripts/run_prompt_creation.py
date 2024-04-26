@@ -300,7 +300,7 @@ PROMPT = """You will be given six descriptive keywords related to an audio sampl
 5. The pace of the speaker's delivery (e.g., very slowly, quite slowly, slightly slowly, moderate speed, slightly fast, quite fast, very fast)
 6. The pitch of the speaker's voice (e.g., very low-pitch, quite low-pitch, slightly low-pitch, moderate pitch, slightly high-pitch, quite high-pitch, very high-pitch)
 
-Your task is to create a text description using these keywords that accurately describes the speech sample. Ensure that the generated description while ensuring the description is grammatically correct, easy to understand, and concise. 
+Your task is to create a text description using these keywords that accurately describes the speech sample. Ensure that the generated description is grammatically correct, easy to understand, and most importantly, concise. 
 You can optionally change the order of keywords, and replace synonymous terms. You can also optionally omit the following terms, as they are default terms: 'moderately balanced reverberation', 'balanced in clarity', 'moderately dynamic', 'moderate speed' and 'moderate pitch'.
 If the amount of noise is 'very noisy' and the level of reverberation is 'distant-sounding', you must include words such as 'very poor recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very close-sounding', you must include terms like 'very good recording' in the description. 
 Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
