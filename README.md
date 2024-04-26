@@ -268,7 +268,7 @@ You could also, to give more examples, filter on a certain pitch level (e.g only
 
 We rely on the [`datasets`](https://huggingface.co/docs/datasets/v2.17.0/en/index) library, which is optimized for speed and efficiency, and is deeply integrated with the [HuggingFace Hub](https://huggingface.co/datasets) which allows easy sharing and loading.
 
-In order to use this repository, you need a speech dataset from [`datasets`](https://huggingface.co/docs/datasets/v2.17.0/en/index) with at least one audio column and a text transcription column.
+In order to use this repository, you need a speech dataset from [`datasets`](https://huggingface.co/docs/datasets/v2.17.0/en/index) with at least one audio column and a text transcription column. Additionally, you also need a gender and a speaker id column, especially if you want to compute pitch.
 
 ### How do I use datasets that I have with this repository?
 
