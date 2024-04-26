@@ -153,7 +153,7 @@ class DataArguments:
         },
     )
     save_steps: Optional[int] = field(
-        default=500,
+        default=100,
         metadata={"help": "Save the generated prompts every save_steps."},
     )
     save_total_limit: Optional[int] = field(
@@ -377,25 +377,30 @@ with LLMSwarm(
 
         for split in raw_datasets:
             total_samples = len(raw_datasets[split])
-            total_inference_steps = math.ceil(total_samples/ model_args.checkpoint_interval)
+            total_inference_steps = math.ceil(total_samples / model_args.checkpoint_interval)
 
             split_output_dir = os.path.join(data_args.output_dir, split)
             progress_bar = tqdm(range(total_inference_steps), desc=f"{split}", position=0)
 
-            all_generated_ids, cur_step = get_last_checkpoint(split_output_dir)
+            all_generated_ids, inference_step = get_last_checkpoint(split_output_dir)
+            if inference_step > 0:
+                logger.info(f"Resuming {split} from step {inference_step}")
+                progress_bar.update(inference_step)
 
-            for inference_step in range(cur_step, total_inference_steps):
+            while inference_step < total_inference_steps:
                 start_index = inference_step * model_args.checkpoint_interval
-                end_index = min((inference_step + 1) * model_args.checkpoint_interval, total_samples + 1)
+                end_index = min((inference_step + 1) * model_args.checkpoint_interval, total_samples)
                 inference_chunk = raw_datasets[split].select(range(start_index, end_index))
                 results = await asyncio.gather(
                     *(process_text(sample) for sample in inference_chunk)
                 )
+                inference_step += 1
                 progress_bar.update(1)
                 all_generated_ids.extend(results)
 
                 if (inference_step % data_args.save_steps == 0) or (inference_step == total_inference_steps):
-                    save_checkpoint(split_output_dir, all_generated_ids, cur_step)
+                    logger.info(f"Saving generations of step {inference_step}")
+                    save_checkpoint(split_output_dir, all_generated_ids, inference_step)
                     rotate_checkpoints(data_args.save_total_limit, output_dir=split_output_dir)
 
             raw_datasets[split] = raw_datasets[split].add_column(
