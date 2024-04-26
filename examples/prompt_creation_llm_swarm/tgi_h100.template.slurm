@@ -6,6 +6,8 @@
 #SBATCH --mem-per-cpu=11G
 #SBATCH -o slurm/logs/%x_%j.out
 
+source ~/.bashrc
+
 # For HF cluster internal users: Check if /fsx directory exists
 if [ -d "/fsx/.cache" ]; then
     export volume="/fsx/.cache"
@@ -31,7 +33,7 @@ export PORT=$(unused_port)
 
 if [ -z "$HUGGING_FACE_HUB_TOKEN" ]; then
     # try reading from file
-    export HUGGING_FACE_HUB_TOKEN=$(cat ~/.cache/huggingface/token)
+    export HUGGING_FACE_HUB_TOKEN=$(cat "${HF_HOME}"/token)
 fi
 
 echo "Starting TGI container port $PORT"
