@@ -371,11 +371,6 @@ def main():
         raise ValueError(f"`is_single_speaker=False` but `speaker_name=data_args.speaker_name` is not specified. Add `--is_single_speaker` or remove `speaker_name`.")
 
     accelerator = Accelerator()
-    
-    if data_args.is_new_speaker_prompt:
-        PROMPT = NEW_PROMPT
-
-    logger.info(f"Using the following prompt: {SINGLE_SPEAKER_PROMPT if data_args.is_single_speaker else PROMPT}")
 
     if data_args.overwrite_output_dir and os.path.exists(data_args.output_dir) and os.path.isdir(data_args.output_dir):
         logger.info("Cleaning output dir from previous run...")
@@ -466,9 +461,12 @@ def main():
 
     speaker_name = data_args.speaker_name
     is_single_speaker = data_args.is_single_speaker
+    is_new_speaker_prompt = data_args.is_new_speaker_prompt
 
     def prepare_dataset(sample):
         sample_prompt = SINGLE_SPEAKER_PROMPT if is_single_speaker else PROMPT
+        if is_new_speaker_prompt:
+            sample_prompt = NEW_PROMPT
         for key in EXPECTED_COLUMNS:
             sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
         if is_single_speaker:
