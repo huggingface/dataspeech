@@ -6,14 +6,10 @@
 #SBATCH --mem-per-cpu=11G
 #SBATCH -o slurm/logs/%x_%j.out
 
+# START EDIT
 source ~/.bashrc
-
-# For HF cluster internal users: Check if /fsx directory exists
-if [ -d "/fsx/.cache" ]; then
-    export volume="/fsx/.cache"
-else
-    export volume=".cache"
-fi
+VOLUME="/fsx/sanchit/.cache"
+# END EDIT
 
 export model={{model}}
 export revision={{revision}}
@@ -41,9 +37,9 @@ echo "http://$(hostname -I | awk '{print $1}'):$PORT" >> {{slurm_hosts_path}}
 
 # unset cache dirs to avoid pyxis having host env var somehow get into the container
 unset HF_HUB_CACHE HF_ASSETS_CACHE HF_DATASETS_CACHE HF_MODULES_CACHE
-srun --container-image='ghcr.io/huggingface/text-generation-inference:2.0' \
+srun --container-image='ghcr.io#huggingface/text-generation-inference:2.0' \
     --container-env=HUGGING_FACE_HUB_TOKEN,PORT \
-    --container-mounts="$volume:/data" \
+    --container-mounts="${VOLUME}:/data" \
     --no-container-mount-home \
     --qos normal \
     /usr/local/bin/text-generation-launcher \

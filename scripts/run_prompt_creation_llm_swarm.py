@@ -10,7 +10,6 @@ from typing import Optional, Tuple, List
 import logging
 
 import math
-import numpy as np
 from datasets import DatasetDict, load_dataset
 from tqdm import tqdm
 from transformers import (
@@ -20,7 +19,6 @@ from transformers import (
 import asyncio
 from llm_swarm import LLMSwarm, LLMSwarmConfig
 from huggingface_hub import AsyncInferenceClient
-from tqdm.asyncio import tqdm_asyncio
 
 
 logger = logging.getLogger(__name__)
@@ -312,7 +310,7 @@ with LLMSwarm(
                 attempt += 1
                 if attempt < data_args.max_retries:
                     print(
-                        f"Request failed due to {e}, retrying in {data_args.retry_delay_in_s} seconds... (Attempt {attempt}/{data_args.max_retries})"
+                        f"Request failed due to {e}\nRetrying in {data_args.retry_delay_in_s} seconds... (Attempt {attempt}/{data_args.max_retries})"
                     )
                     await asyncio.sleep(data_args.retry_delay_in_s)
                 else:
