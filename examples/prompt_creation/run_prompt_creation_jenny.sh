@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-python ./scripts/run_prompt_creation_single_speaker.py \
+python ./scripts/run_prompt_creation.py \
   --speaker_name "Jenny" \
+  --is_single_speaker \
   --dataset_name "ylacombe/jenny-tts-tags" \
   --dataset_config_name "default" \
   --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \

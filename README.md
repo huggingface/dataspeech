@@ -101,11 +101,12 @@ Here, we decided to create prompts that use the name `Jenny`, prompts that'll lo
 
 This step generally demands more resources and times and should use one or many GPUs.
 
-[`run_prompt_creation_jenny.sh`](examples/prompt_creation/run_prompt_creation_jenny.sh) indicates how to run it on LibriTTS-R:
+[`run_prompt_creation_jenny.sh`](examples/prompt_creation/run_prompt_creation_jenny.sh) indicates how to run it on the Jenny dataset:
 
 ```sh
-python ./scripts/run_prompt_creation_single_speaker.py \
+python ./scripts/run_prompt_creation.py \
   --speaker_name "Jenny" \
+  --is_single_speaker \
   --dataset_name "ylacombe/jenny-tts-tags" \
   --dataset_config_name "default" \
   --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
