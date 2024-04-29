@@ -342,23 +342,25 @@ def main():
         data_splits = data_args.dataset_split_name.split("+")
         # load on a split-wise basis
         for split in data_splits:
-            raw_datasets[split] = load_dataset(
+            with accelerator.local_main_process_first():
+                raw_datasets[split] = load_dataset(
+                    data_args.dataset_name,
+                    data_args.dataset_config_name,
+                    split=split,
+                    cache_dir=model_args.cache_dir,
+                    token=model_args.token,
+                    num_proc=data_args.preprocessing_num_workers,
+                )
+    else:
+        with accelerator.local_main_process_first():
+            # load all splits for annotation
+            raw_datasets = load_dataset(
                 data_args.dataset_name,
                 data_args.dataset_config_name,
-                split=split,
                 cache_dir=model_args.cache_dir,
                 token=model_args.token,
                 num_proc=data_args.preprocessing_num_workers,
             )
-    else:
-        # load all splits for annotation
-        raw_datasets = load_dataset(
-            data_args.dataset_name,
-            data_args.dataset_config_name,
-            cache_dir=model_args.cache_dir,
-            token=model_args.token,
-            num_proc=data_args.preprocessing_num_workers,
-        )
 
     raw_datasets_features = set(raw_datasets[next(iter(raw_datasets))].features.keys())
 
@@ -425,7 +427,7 @@ def main():
         sample["input_ids"] = token_ids
         return sample
 
-    with accelerator.main_process_first():
+    with accelerator.local_main_process_first():
         vectorized_datasets = raw_datasets.map(
             prepare_dataset, num_proc=data_args.preprocessing_num_workers, desc="Preparing prompts"
         )
@@ -496,6 +498,7 @@ def main():
                 desc="Postprocessing dataset",
                 remove_columns=["input_ids", "generated_ids"],
             )
+        accelerator.wait_for_everyone()
 
     if accelerator.is_main_process:
         vectorized_datasets.save_to_disk(data_args.output_dir)
@@ -505,7 +508,7 @@ def main():
                 config_name=data_args.dataset_config_name if data_args.dataset_config_name is not None else "default",
                 token=model_args.token,
             )
-
+    accelerator.wait_for_everyone()
     accelerator.end_training()
 
 
