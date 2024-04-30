@@ -45,6 +45,7 @@ def pitch_apply(batch, rank=None, audio_column_name="audio", output_column_name=
         batch[f"{output_column_name}_mean"] = utterance_pitch_mean 
         batch[f"{output_column_name}_std"] = utterance_pitch_std 
     else:
+        sample = batch[audio_column_name]
         pitch, periodicity = penn.from_audio(
                 torch.tensor(sample["array"][None, :]).float(),
                 sample["sampling_rate"],
