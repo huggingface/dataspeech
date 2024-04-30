@@ -168,6 +168,16 @@ class DataArguments:
     save_total_limit: Optional[int] = field(
         default=1, metadata={"help": ("If a value is passed, will limit the total number of saved checkpoints")}
     )
+    speaker_name: Optional[str] = field(
+        default=None,
+        metadata={"help": "If `is_single_speaker`, it specified the speaker name that you want to give to the mono-speaker of your dataset."},
+    )
+    is_single_speaker: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use a single speaker prompt, with a single name, specified by `speaker_name`."}
+    )
+    is_new_speaker_prompt: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use the newest speaker prompt, which will be used for the next Parler-TTS."}
+    )
 
     def __post_init__(self):
         if self.push_to_hub and self.hub_dataset_id is None:
@@ -294,6 +304,18 @@ class DataCollatorWithPadding:
 # TODO(SG): add accent keyword
 PROMPT = """You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
 1. The gender (e.g., male, female)
+2. The level of reverberation (e.g., very roomy sounding, quite roomy sounding, slightly roomy sounding, moderate reverberation, slightly confined sounding, quite confined sounding, very confined sounding)
+3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, moderate ambient sound, slightly clear, quite clear, very clear)
+4. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderate intonation, slightly expressive, quite expressive, very expressive)
+5. The pace of the speaker's delivery (e.g., very slowly, quite slowly, slightly slowly, moderate speed, slightly fast, quite fast, very fast)
+6. The pitch of the speaker's voice (e.g., very low pitch, quite low pitch, slightly low pitch, moderate pitch, slightly high pitch, quite high pitch, very high pitch)
+Your task is to create a text description using these keywords that accurately describes the speech sample while ensuring the description remains grammatically correct and easy to understand. You should rearrange the keyword order as necessary, and substitute synonymous terms where appropriate. If the amount of noise is 'very noisy' and the level of reverberation is 'very roomy sounding', include terms like 'very bad recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very confined sounding', include terms like 'very good recording' in the description. Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
+For example, given the following keywords: 'female', 'slightly roomy sounding', 'slightly noisy', 'very expressive', 'slightly low pitch', 'very slowly', a valid description would be: 'a woman with a deep voice speaks slowly but has an animated delivery in an echoey room with some background noise'.
+For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:"
+"""
+
+NEW_PROMPT = """You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
+1. The gender (e.g., male, female)
 2. The level of reverberation (e.g., very distant-sounding, quite distant-sounding, slightly distant-sounding, moderately balanced reverberation, slightly close-sounding, quite close-sounding, very close-sounding)
 3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, balanced in clarity, slightly clean, quite clean, very clean)
 4. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderately dynamic, slightly expressive and animated, quite expressive and animated, very expressive and animated)
@@ -310,6 +332,19 @@ Another valid description would be: 'In a room with slight background noise, a f
 Another valid description would be: 'A female voice enunciates an animated and expressive speech. Her voice is slightly distant-sounding, with some background noise present. She speaks very slowly with a moderate pitch but a very expressive tone.'
 For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:"""
 
+SINGLE_SPEAKER_PROMPT = """You will be given four descriptive keywords related to an audio sample of [speaker_name]'s speech. These keywords include:
+1. The level of reverberation (e.g., very roomy sounding, quite roomy sounding, slightly roomy sounding, moderate reverberation, slightly confined sounding, quite confined sounding, very confined sounding)
+2. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, moderate ambient sound, slightly clear, quite clear, very clear)
+3. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderate intonation, slightly expressive, quite expressive, very expressive)
+4. The pace of the speaker's delivery (e.g., very slowly, quite slowly, slightly slowly, moderate speed, slightly fast, quite fast, very fast)
+
+Your task is to create a single and only short text description using these keywords that accurately describes the speech sample while ensuring the description remains grammatically correct and easy to understand. You should rearrange the keyword order as necessary, and substitute synonymous terms where appropriate. If the amount of noise is 'very noisy' and the level of reverberation is 'very roomy sounding', you must include terms like 'very bad recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very confined sounding', you must include terms like 'very good recording' in the description. Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
+
+For example, given the following keywords: 'slightly roomy sounding', 'quite noisy', 'very expressive', 'very slowly', a valid description would be: '[speaker_name] speaks very slowly but has an animated delivery in an echoey room with background noise.'.
+Feel free to change the order of keywords, and to use synonyms, for example, with the previous keywords: `In a very expressive voice, [speaker_name] pronounces her words incredibly slowly. There's some background noise in this room with a bit of echo.'.
+
+For the keywords: ''[reverberation]', '[noise]', '[speech_monotony]', '[speaking_rate]', the corresponding description is:
+"""
 
 def main():
     # 1. Parse input arguments
@@ -328,6 +363,12 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
+    
+    if data_args.is_single_speaker and data_args.speaker_name is None:
+        raise ValueError("`is_single_speaker=True` but `speaker_name` is not specified. Specify it or remove `is_single_speaker`.")
+
+    if not data_args.is_single_speaker and data_args.speaker_name:
+        raise ValueError(f"`is_single_speaker=False` but `speaker_name=data_args.speaker_name` is not specified. Add `--is_single_speaker` or remove `speaker_name`.")
 
     accelerator = Accelerator()
 
@@ -342,23 +383,25 @@ def main():
         data_splits = data_args.dataset_split_name.split("+")
         # load on a split-wise basis
         for split in data_splits:
-            raw_datasets[split] = load_dataset(
+            with accelerator.local_main_process_first():
+                raw_datasets[split] = load_dataset(
+                    data_args.dataset_name,
+                    data_args.dataset_config_name,
+                    split=split,
+                    cache_dir=model_args.cache_dir,
+                    token=model_args.token,
+                    num_proc=data_args.preprocessing_num_workers,
+                )
+    else:
+        with accelerator.local_main_process_first():
+            # load all splits for annotation
+            raw_datasets = load_dataset(
                 data_args.dataset_name,
                 data_args.dataset_config_name,
-                split=split,
                 cache_dir=model_args.cache_dir,
                 token=model_args.token,
                 num_proc=data_args.preprocessing_num_workers,
             )
-    else:
-        # load all splits for annotation
-        raw_datasets = load_dataset(
-            data_args.dataset_name,
-            data_args.dataset_config_name,
-            cache_dir=model_args.cache_dir,
-            token=model_args.token,
-            num_proc=data_args.preprocessing_num_workers,
-        )
 
     raw_datasets_features = set(raw_datasets[next(iter(raw_datasets))].features.keys())
 
@@ -416,16 +459,24 @@ def main():
         tokenizer.pad_token_id = tokenizer.bos_token_id
         model.generation_config.pad_token_id = model.generation_config.eos_token_id
 
+    speaker_name = data_args.speaker_name
+    is_single_speaker = data_args.is_single_speaker
+    is_new_speaker_prompt = data_args.is_new_speaker_prompt
+
     def prepare_dataset(sample):
-        sample_prompt = PROMPT
+        sample_prompt = SINGLE_SPEAKER_PROMPT if is_single_speaker else PROMPT
+        if is_new_speaker_prompt:
+            sample_prompt = NEW_PROMPT
         for key in EXPECTED_COLUMNS:
             sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
+        if is_single_speaker:
+            sample_prompt = sample_prompt.replace(f"[speaker_name]", speaker_name)
         sample_prompt = [{"role": "user", "content": sample_prompt}]
         token_ids = tokenizer.apply_chat_template(sample_prompt)
         sample["input_ids"] = token_ids
         return sample
 
-    with accelerator.main_process_first():
+    with accelerator.local_main_process_first():
         vectorized_datasets = raw_datasets.map(
             prepare_dataset, num_proc=data_args.preprocessing_num_workers, desc="Preparing prompts"
         )
@@ -496,6 +547,7 @@ def main():
                 desc="Postprocessing dataset",
                 remove_columns=["input_ids", "generated_ids"],
             )
+        accelerator.wait_for_everyone()
 
     if accelerator.is_main_process:
         vectorized_datasets.save_to_disk(data_args.output_dir)
@@ -505,7 +557,7 @@ def main():
                 config_name=data_args.dataset_config_name if data_args.dataset_config_name is not None else "default",
                 token=model_args.token,
             )
-
+    accelerator.wait_for_everyone()
     accelerator.end_training()
 
 
