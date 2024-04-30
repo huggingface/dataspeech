@@ -411,6 +411,8 @@ def main():
 
     # TODO(SG): add accent
     EXPECTED_COLUMNS = {"gender", "pitch", "noise", "reverberation", "speech_monotony", "speaking_rate"}
+    if data_args.is_single_speaker:
+        EXPECTED_COLUMNS = {"noise", "reverberation", "speech_monotony", "speaking_rate"}
     if not EXPECTED_COLUMNS.issubset(raw_datasets_features):
         missing_columns = EXPECTED_COLUMNS - raw_datasets_features
         raise ValueError(
