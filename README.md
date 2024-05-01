@@ -216,19 +216,31 @@ python main.py --help
 
 ### 3. Generate natural language descriptions
 
-Now that we have text bins associated to our datasets, the next step is to create natural language descriptions out of the few created features.
+Now that we have text bins associated to our datasets, the next step is to create natural language descriptions. To 
+achieve this, we pass the discrete features to an LLM, and have it generate a natural language description. This step 
+generally demands more resources and times and should use one or many GPUs. It can be performed in one of two ways:
+1. Using the [Accelerate](https://huggingface.co/docs/accelerate/index)-based script, [`scripts/run_prompt_creation.py`](/scripts/run_prompt_creation.py), or
+2. Using the [TGI](https://huggingface.co/docs/text-generation-inference/en/index)-based script, [`scripts/run_prompt_creation_llm_swarm.py`](/scripts/run_prompt_creation_llm_swarm.py)
 
-[`scripts/run_prompt_creation.py`](/scripts/run_prompt_creation.py) relies on [`accelerate`](https://huggingface.co/docs/accelerate/index) and [`transformers`](https://huggingface.co/docs/transformers/index) to generate natural language descriptions from LLMs. This step generally demands more resources and times and should use one or many GPUs.
+We recommend you first try the Accelerate script, since it makes no assumptions about the GPU hardware available and is 
+thus easier to run. Should you need faster inference, you can switch to the TGI script, which assumes you have a SLURM 
+cluster with Docker support.
 
-[`examples/prompt_creation/run_prompt_creation_1k.sh`](examples/prompt_creation/run_prompt_creation_1k.sh) indicates how to run it on LibriTTS-R:
+### 3.1 Accelerate Inference
+
+[`scripts/run_prompt_creation.py`](/scripts/run_prompt_creation.py) relies on [`accelerate`](https://huggingface.co/docs/accelerate/index) and [`transformers`](https://huggingface.co/docs/transformers/index) to generate natural language descriptions from LLMs. 
+
+[`examples/prompt_creation/run_prompt_creation_1k.sh`](examples/prompt_creation/run_prompt_creation_1k.sh) indicates how to run it on LibriTTS-R
+with 8 GPUs in half-precision:
 
 ```sh
 accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_prompt_creation.py \
   --dataset_name "parler-tts/libritts-r-tags-and-text" \
   --dataset_config_name "clean" \
-  --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
+  --model_name_or_path "meta-llama/Meta-Llama-3-8B-Instruct" \
   --per_device_eval_batch_size 64 \
   --attn_implementation "sdpa" \
+  --torch_compile \
   --dataloader_num_workers 4 \
   --output_dir "./" \
   --load_in_4bit \
@@ -236,7 +248,7 @@ accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_promp
   --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated"
 ```
 
-As usual, we define the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model. If you use a LLaMA or Gemma checkpoint, you can improve throughput by up to 1.5x by adding the flag `--torch_compile` to the arguments.
+As usual, we define the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used an instruction-tuned version of Meta's LLaMA-3 8B model. Should you use LLaMA or Gemma, you can enable torch compile with the flag `--torch_compile` for up to 1.5x faster inference.
 
 The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains more examples.
 
@@ -246,6 +258,33 @@ The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains mor
 > 
 > For example, `scripts/run_prompt_creation.py` can be adapted to perform large-scaled inference using other LLMs and prompts.
 
+### 3.2 TGI Inference
+
+[`scripts/run_prompt_creation_llm_swarm.py`](/scripts/run_prompt_creation_llm_swarm.py) relies on [TGI](https://huggingface.co/docs/text-generation-inference/en/index) 
+and [LLM-Swarm](https://github.com/huggingface/llm-swarm/tree/main) to generate descriptions from an LLM endpoint.
+Compared to the Accelerate script, it uses continuous-batching, which improves throughput by up to 1.5x. It requires one 
+extra dependency, LLM-Swarm:
+
+```sh
+pip install git+https://github.com/huggingface/llm-swarm.git
+```
+
+[`examples/prompt_creation_llm_swarm/run_prompt_creation_1k.sh`](examples/prompt_creation_llm_swarm/run_prompt_creation_1k.sh) indicates how to run it on LibriTTS-R
+with 1 TGI instance:
+
+```sh
+python run_prompt_creation_llm_swarm.py \
+  --dataset_name "stable-speech/libritts-r-tags-and-text" \
+  --dataset_config_name "clean" \
+  --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
+  --num_instances "1" \
+  --output_dir "./" \
+  --push_to_hub \
+  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated"
+```
+
+Note that the script relies on the SLURM file [`examples/prompt_creation_llm_swarm/tgi_h100.template.slurm`](examples/prompt_creation_llm_swarm/tgi_h100.template.slurm),
+which is a template configuration for the Hugging Face H100 cluster. You can update the config based on your cluster.
 
 ### To conclude
 
