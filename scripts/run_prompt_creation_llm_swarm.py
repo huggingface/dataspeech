@@ -308,11 +308,11 @@ with LLMSwarm(
                     )
             except Exception as e:
                 attempt += 1
-                if attempt < data_args.max_retries:
+                if attempt < model_args.max_retries:
                     print(
-                        f"Request failed due to {e}\nRetrying in {data_args.retry_delay_in_s} seconds... (Attempt {attempt}/{data_args.max_retries})"
+                        f"Request failed due to {e}\nRetrying in {model_args.retry_delay_in_s} seconds... (Attempt {attempt}/{model_args.max_retries})"
                     )
-                    await asyncio.sleep(data_args.retry_delay_in_s)
+                    await asyncio.sleep(model_args.retry_delay_in_s)
                 else:
                     raise ValueError(
                         f"Max retries reached. Failed with error: {e}."
