@@ -168,7 +168,7 @@ You can learn more about the arguments you can pass to `main.py` by passing:
 python main.py --help
 ```
 
-In [`/examples/tagging/run_main_1k.sh`](/examples/run_main_1k.sh), we scaled up the initial command line to the whole dataset. Note that we've used the `repo_id` argument to push the dataset to the hub, resulting in [this dataset](https://huggingface.co/datasets/ylacombe/libritts_r_tags).
+In [`/examples/tagging/run_main_1k.sh`](/examples/tagging/run_main_1k.sh), we scaled up the initial command line to the whole dataset. Note that we've used the `repo_id` argument to push the dataset to the hub, resulting in [this dataset](https://huggingface.co/datasets/ylacombe/libritts_r_tags).
 
 The dataset viewer gives an idea of what has been done, namely:
 - new columns were added:
