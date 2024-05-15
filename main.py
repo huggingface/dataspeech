@@ -1,8 +1,10 @@
 from datasets import load_dataset
-from multiprocess import set_start_method
-from dataspeech import rate_apply, pitch_apply, snr_apply
+# from multiprocess import set_start_method
+from dataspeech import rate_apply, pitch_apply, snr_apply, squim_apply
 import torch
 import argparse
+
+from torch.multiprocessing import set_start_method
 
 
 if __name__ == "__main__":
@@ -36,6 +38,18 @@ if __name__ == "__main__":
     text_column_name = "text" if args.rename_column else args.text_column_name
     if args.rename_column:
         dataset = dataset.rename_columns({args.audio_column_name: "audio", args.text_column_name: "text"})
+        
+    # TODO
+    print("Compute pitch")
+    squim_dataset = dataset.map(
+        squim_apply,
+        batched=True,
+        batch_size=args.batch_size,
+        with_rank=True if torch.cuda.device_count()>0 else False,
+        num_proc=torch.cuda.device_count()*args.num_workers_per_gpu_for_pitch if torch.cuda.device_count()>0 else args.cpu_num_workers, # TODO
+        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+        fn_kwargs={"audio_column_name": audio_column_name,},
+    )
 
     print("Compute pitch")
     pitch_dataset = dataset.map(
