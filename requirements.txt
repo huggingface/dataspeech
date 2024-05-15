@@ -6,3 +6,4 @@ demucs
 transformers
 accelerate
 bitsandbytes
+pyannote.audio<3.2.0
