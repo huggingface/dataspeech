@@ -24,9 +24,9 @@ def squim_apply(batch, rank=None, audio_column_name="audio"):
             waveform = torchaudio.functional.resample(torch.tensor(sample["array"][None, :]).to(device).float(), sample["sampling_rate"], SQUIM_OBJECTIVE.sample_rate)
             with torch.no_grad():
                 stoi_sample, pesq_sample, sdr_sample = model(waveform)
-            sdr.append(sdr_sample.cpu())
-            pesq.append(pesq_sample.cpu())
-            stoi.append(stoi_sample.cpu())
+            sdr.append(sdr_sample.cpu()[0])
+            pesq.append(pesq_sample.cpu()[0])
+            stoi.append(stoi_sample.cpu()[0])
 
         batch["sdr"] = sdr
         batch["pesq"] = pesq
@@ -36,9 +36,9 @@ def squim_apply(batch, rank=None, audio_column_name="audio"):
         waveform = torchaudio.functional.resample(torch.tensor(batch[audio_column_name]["array"][None, :]).to(device).float(), batch[audio_column_name]["sampling_rate"], SQUIM_OBJECTIVE.sample_rate)
         with torch.no_grad():
             stoi_sample, pesq_sample, sdr_sample = model(waveform)
-        batch["sdr"] = sdr_sample
-        batch["pesq"] = pesq_sample
-        batch["stoi"] = stoi_sample
+        batch["sdr"] = sdr_sample.cpu()[0]
+        batch["pesq"] = pesq_sample.cpu()[0]
+        batch["stoi"] = stoi_sample.cpu()[0]
         # TODO
     return batch
 

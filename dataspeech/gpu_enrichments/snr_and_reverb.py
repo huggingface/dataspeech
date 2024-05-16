@@ -6,7 +6,7 @@ from huggingface_hub import hf_hub_download
 
 model = None
 
-def snr_apply(batch, rank=None, audio_column_name="audio"):
+def snr_apply(batch, rank=None, audio_column_name="audio", batch_size=32):
     global model
     if model is None:
         model = Model.from_pretrained(
@@ -19,7 +19,7 @@ def snr_apply(batch, rank=None, audio_column_name="audio"):
         # move to device and create pipeline here because the pipeline moves to the first GPU it finds anyway
         model.to(device)
 
-    pipeline = RegressiveActivityDetectionPipeline(segmentation=model)
+    pipeline = RegressiveActivityDetectionPipeline(segmentation=model, batch_size = batch_size)
     if rank:
         pipeline.to(torch.device(device))
     
@@ -28,20 +28,35 @@ def snr_apply(batch, rank=None, audio_column_name="audio"):
     if isinstance(batch[audio_column_name], list):  
         snr = []
         c50 = []
+        vad_durations = []
         for sample in batch[audio_column_name]:
             res = pipeline({"sample_rate": sample["sampling_rate"],
                             "waveform": torch.tensor(sample["array"][None, :]).to(device).float()})
             
-            snr.append(res["snr"].mean())
-            c50.append(res["c50"].mean())
+            mask =  ~ ((res["snr"] == 0.0) & (res["c50"] == 0.0)) 
+            if "vad_detection_array" in res:
+                mask = mask & res["vad_detection_array"]
+            
+            vad_duration = sum(map(lambda x: x[0].duration, res["annotation"].itertracks()))
+            
+            snr.append(res["snr"][mask].mean())
+            c50.append(res["c50"][mask].mean())
+            vad_durations.append(vad_duration)
         
+        # 16ms window
         batch["snr"] = snr
         batch["c50"] = c50
+        batch["speech_duration"] = vad_durations
+        
     else:
         res = pipeline({"sample_rate": batch[audio_column_name]["sampling_rate"],
                         "waveform": torch.tensor(batch[audio_column_name]["array"][None, :]).to(device).float()})
         
-        batch["snr"] = res["snr"].mean()
-        batch["c50"] = res["c50"].mean()
-
-    return batch
+        mask =  ~ ((res["snr"] == 0.0) & (res["c50"] == 0.0)) 
+        if "vad_detection_array" in res:
+            mask = mask & res["vad_detection_array"]        
+        vad_duration = sum(map(lambda x: x[0].duration, res["annotation"].itertracks()))
+        
+        batch["snr"] = res["snr"][mask].mean()
+        batch["c50"] = res["c50"][mask].mean()
+        batch["speech_duration"] = vad_duration
