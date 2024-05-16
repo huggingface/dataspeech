@@ -60,3 +60,5 @@ def snr_apply(batch, rank=None, audio_column_name="audio", batch_size=32):
         batch["snr"] = res["snr"][mask].mean()
         batch["c50"] = res["c50"][mask].mean()
         batch["speech_duration"] = vad_duration
+        
+    return batch

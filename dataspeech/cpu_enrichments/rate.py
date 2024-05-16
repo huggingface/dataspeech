@@ -9,7 +9,7 @@ def rate_apply(batch, rank=None, audio_column_name="audio", text_column_name="te
         if "speech_duration" in batch:
             for text, audio_duration in zip(batch[text_column_name], batch["speech_duration"]):
                 phonemes = transducer(text).output_string
-                speaking_rate = len(phonemes) / audio_length
+                speaking_rate = len(phonemes) / audio_duration
                 speaking_rates.append(speaking_rate)
                 phonemes_list.append(phonemes)
         else:

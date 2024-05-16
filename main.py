@@ -1,10 +1,8 @@
 from datasets import load_dataset
-# from multiprocess import set_start_method # TODO
+from multiprocess import set_start_method
 from dataspeech import rate_apply, pitch_apply, snr_apply, squim_apply
 import torch
 import argparse
-
-from torch.multiprocessing import set_start_method
 
 
 if __name__ == "__main__":
@@ -77,13 +75,12 @@ if __name__ == "__main__":
     )
     
     print("Compute speaking rate")
-    if "speech_duration" in dataset[next(iter(dataset.keys()))]:    
-        rate_dataset = dataset.map(
-            snr_dataset,
+    if "speech_duration" in snr_dataset[next(iter(snr_dataset.keys()))].features:    
+        rate_dataset = snr_dataset.map(
+            rate_apply,
             with_rank=False,
             num_proc=args.cpu_num_workers,
             writer_batch_size= args.cpu_writer_batch_size,
-            remove_columns=[audio_column_name], # tricks to avoid rewritting audio
             fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
         )
     else:
