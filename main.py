@@ -77,17 +77,29 @@ if __name__ == "__main__":
     )
     
     print("Compute speaking rate")
-    rate_dataset = dataset.map(
-        rate_apply,
-        with_rank=False,
-        num_proc=args.cpu_num_workers,
-        writer_batch_size= args.cpu_writer_batch_size,
-        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
-        fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
-    )
+    if "speech_duration" in dataset[next(iter(dataset.keys()))]:    
+        rate_dataset = dataset.map(
+            snr_dataset,
+            with_rank=False,
+            num_proc=args.cpu_num_workers,
+            writer_batch_size= args.cpu_writer_batch_size,
+            remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+            fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
+        )
+    else:
+        rate_dataset = dataset.map(
+            rate_apply,
+            with_rank=False,
+            num_proc=args.cpu_num_workers,
+            writer_batch_size= args.cpu_writer_batch_size,
+            remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+            fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
+        )
     
     for split in dataset.keys():
         dataset[split] = pitch_dataset[split].add_column("snr", snr_dataset[split]["snr"]).add_column("c50", snr_dataset[split]["c50"])
+        if "speech_duration" in snr_dataset[split]:
+            dataset[split] = dataset[split].add_column("speech_duration", snr_dataset[split]["snr"])
         dataset[split] = dataset[split].add_column("speaking_rate", rate_dataset[split]["speaking_rate"]).add_column("phonemes", rate_dataset[split]["phonemes"])
         if args.apply_squim_quality_estimation:
             dataset[split] = dataset[split].add_column("stoi", squim_dataset[split]["stoi"]).add_column("si-sdr", squim_dataset[split]["sdr"]).add_column("pesq", squim_dataset[split]["pesq"])

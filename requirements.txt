@@ -1,9 +1,8 @@
 datasets[audio]
-https://github.com/marianne-m/brouhaha-vad/archive/main.zip
+https://github.com/ylacombe/brouhaha-vad/archive/refs/heads/dataspeech-version.zip
 penn
 g2p
 demucs
 transformers
 accelerate
 bitsandbytes
-pyannote.audio<3.2.0
