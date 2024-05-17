@@ -29,7 +29,7 @@ def visualize_bins_to_text(values_1, values_2, name_1, name_2, text_bins, save_d
 
 
     # Plot histogram and vertical lines for subplot 2
-    axs[1].hist(values_2, bins=50, color='green', alpha=0.7)
+    axs[1].hist(values_2, bins=default_bins, color='green', alpha=0.7)
     _, bin_edges2 = np.histogram(values_2, bins=len(text_bins), range=(lower_range, values_2.max()) if lower_range else None)
     for edge in bin_edges2:
         axs[1].axvline(x=edge, color='red', linestyle='--', linewidth=1)
@@ -69,11 +69,11 @@ def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_sp
             filtered_values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
 
         if save_dir is not None:
-            visualize_bins_to_text(values, filtered_values, "Before filtering", "After filtering", text_bins, save_dir, output_column_name, lower_range)
+            visualize_bins_to_text(values, filtered_values, "Before filtering", "After filtering", text_bins, save_dir, output_column_name, lower_range=lower_range)
             
         # speaking_rate can easily have outliers
         if save_dir is not None and output_column_name=="speaking_rate":
-            visualize_bins_to_text(filtered_values, filtered_values, "After filtering", "After filtering", text_bins, save_dir, f"{output_column_name}_after_filtering", lower_range)
+            visualize_bins_to_text(filtered_values, filtered_values, "After filtering", "After filtering", text_bins, save_dir, f"{output_column_name}_after_filtering", lower_range=lower_range)
         
         values = filtered_values
         hist, bin_edges = np.histogram(values, bins = len(text_bins), range=(lower_range, values.max()) if lower_range else None)
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--leading_split_for_bins", default=None, type=str, help="If specified, will use every split that contains this string to compute statistics. If not specified, will use every split. Only used if `path_to_bin_edges=False`.")
     parser.add_argument("--plot_directory", default=None, type=str, help="If specified, will save visualizing plots to this directory. Only used if `path_to_bin_edges=False`.")
     parser.add_argument("--only_save_plot", default=False, action="store_true", help="If `True` and `--plot_directory` is specified, will only compute plot. Only used if `path_to_bin_edges=False`.")
-    parser.add_argument("--snr_lower_range", default=50, type=float, help="The lower range of the SNR bins")
+    parser.add_argument("--snr_lower_range", default=None, type=float, help="The lower range of the SNR bins")
 
     args = parser.parse_args()
     
