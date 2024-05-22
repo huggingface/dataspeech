@@ -1,5 +1,5 @@
 datasets[audio]
-https://github.com/ylacombe/brouhaha-vad/archive/refs/heads/dataspeech-version.zip
+https://github.com/marianne-m/brouhaha-vad/archive/main.zip
 penn
 g2p
 demucs
