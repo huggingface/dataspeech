@@ -3,6 +3,7 @@ import torch
 import torchaudio
 
 model = None
+max_audio_length = 15 * SQUIM_OBJECTIVE.sample_rate
 
 def squim_apply(batch, rank=None, audio_column_name="audio"):
     global model
@@ -15,14 +16,14 @@ def squim_apply(batch, rank=None, audio_column_name="audio"):
         model.to(device)
     else:
         device = "cpu"
-
     if isinstance(batch[audio_column_name], list):  
         sdr = []
         pesq = []
         stoi = []
         for sample in batch[audio_column_name]:
-            waveform = torchaudio.functional.resample(torch.tensor(sample["array"][None, :]).to(device).float(), sample["sampling_rate"], SQUIM_OBJECTIVE.sample_rate)
+            waveform = torchaudio.functional.resample(torch.tensor(sample["array"])[None, :].to(device).float(), sample["sampling_rate"], SQUIM_OBJECTIVE.sample_rate)
             with torch.no_grad():
+                waveform = waveform[:, :min(max_audio_length, waveform.shape[1])]
                 stoi_sample, pesq_sample, sdr_sample = model(waveform)
             sdr.append(sdr_sample.cpu()[0])
             pesq.append(pesq_sample.cpu()[0])
