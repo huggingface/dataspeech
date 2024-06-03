@@ -1,6 +1,6 @@
-from datasets import load_dataset
+from datasets import load_dataset, Audio
 from multiprocess import set_start_method
-from dataspeech import rate_apply, pitch_apply, snr_apply
+from dataspeech import rate_apply, pitch_apply, snr_apply, squim_apply
 import torch
 import argparse
 
@@ -23,6 +23,8 @@ if __name__ == "__main__":
     parser.add_argument("--penn_batch_size", default=4096, type=int, help="Pitch estimation chunks audio into smaller pieces and processes them in batch. This specify the batch size. If you are using a gpu, pick a batch size that doesn't cause memory errors.")
     parser.add_argument("--num_workers_per_gpu_for_pitch", default=1, type=int, help="Number of workers per GPU for the pitch estimation if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
     parser.add_argument("--num_workers_per_gpu_for_snr", default=1, type=int, help="Number of workers per GPU for the SNR and reverberation estimation if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
+    parser.add_argument("--apply_squim_quality_estimation", action="store_true", help="If set, will also use torchaudio-squim estimation (SI-SNR, STOI and PESQ).")
+    parser.add_argument("--num_workers_per_gpu_for_squim", default=1, type=int, help="Number of workers per GPU for the SI-SNR, STOI and PESQ estimation if GPUs are available. Defaults to 1 if some are avaiable. Useful if you want multiple processes per GPUs to maximise GPU usage.")
 
 
     args = parser.parse_args()
@@ -36,9 +38,22 @@ if __name__ == "__main__":
     text_column_name = "text" if args.rename_column else args.text_column_name
     if args.rename_column:
         dataset = dataset.rename_columns({args.audio_column_name: "audio", args.text_column_name: "text"})
+        
+
+    if args.apply_squim_quality_estimation:
+        print("Compute SI-SDR, PESQ, STOI")
+        squim_dataset = dataset.map(
+            squim_apply,
+            batched=True,
+            batch_size=args.batch_size,
+            with_rank=True if torch.cuda.device_count()>0 else False,
+            num_proc=torch.cuda.device_count()*args.num_workers_per_gpu_for_squim if torch.cuda.device_count()>0 else args.cpu_num_workers,
+            remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+            fn_kwargs={"audio_column_name": audio_column_name,},
+        )
 
     print("Compute pitch")
-    pitch_dataset = dataset.map(
+    pitch_dataset = dataset.cast_column(audio_column_name, Audio(sampling_rate=16_000)).map(
         pitch_apply,
         batched=True,
         batch_size=args.batch_size,
@@ -60,18 +75,31 @@ if __name__ == "__main__":
     )
     
     print("Compute speaking rate")
-    rate_dataset = dataset.map(
-        rate_apply,
-        with_rank=False,
-        num_proc=args.cpu_num_workers,
-        writer_batch_size= args.cpu_writer_batch_size,
-        remove_columns=[audio_column_name], # tricks to avoid rewritting audio
-        fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
-    )
+    if "speech_duration" in snr_dataset[next(iter(snr_dataset.keys()))].features:    
+        rate_dataset = snr_dataset.map(
+            rate_apply,
+            with_rank=False,
+            num_proc=args.cpu_num_workers,
+            writer_batch_size= args.cpu_writer_batch_size,
+            fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
+        )
+    else:
+        rate_dataset = dataset.map(
+            rate_apply,
+            with_rank=False,
+            num_proc=args.cpu_num_workers,
+            writer_batch_size= args.cpu_writer_batch_size,
+            remove_columns=[audio_column_name], # tricks to avoid rewritting audio
+            fn_kwargs={"audio_column_name": audio_column_name, "text_column_name": text_column_name},
+        )
     
     for split in dataset.keys():
         dataset[split] = pitch_dataset[split].add_column("snr", snr_dataset[split]["snr"]).add_column("c50", snr_dataset[split]["c50"])
+        if "speech_duration" in snr_dataset[split]:
+            dataset[split] = dataset[split].add_column("speech_duration", snr_dataset[split]["snr"])
         dataset[split] = dataset[split].add_column("speaking_rate", rate_dataset[split]["speaking_rate"]).add_column("phonemes", rate_dataset[split]["phonemes"])
+        if args.apply_squim_quality_estimation:
+            dataset[split] = dataset[split].add_column("stoi", squim_dataset[split]["stoi"]).add_column("si-sdr", squim_dataset[split]["sdr"]).add_column("pesq", squim_dataset[split]["pesq"])
     
     if args.output_dir:
         print("Saving to disk...")
