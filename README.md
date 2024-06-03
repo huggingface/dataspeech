@@ -377,8 +377,8 @@ This library is still a WIP. Other utility scripts should come soon.
 ### TODOs
 - [ ] Accent classification training script
 - [ ] Accent classification inference script
-- [ ] Better speaking rate estimation with long silence removal
-- [ ] Better SNR estimation with other SNR models
+- [x] Better speaking rate estimation with long silence removal
+- [x] Better SNR estimation with other SNR models
 - [ ] Add more annotation categories
 - [ ] Multilingual speaking rate estimation
 
