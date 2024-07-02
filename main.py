@@ -96,7 +96,7 @@ if __name__ == "__main__":
     for split in dataset.keys():
         dataset[split] = pitch_dataset[split].add_column("snr", snr_dataset[split]["snr"]).add_column("c50", snr_dataset[split]["c50"])
         if "speech_duration" in snr_dataset[split]:
-            dataset[split] = dataset[split].add_column("speech_duration", snr_dataset[split]["snr"])
+            dataset[split] = dataset[split].add_column("speech_duration", snr_dataset[split]["speech_duration"])
         dataset[split] = dataset[split].add_column("speaking_rate", rate_dataset[split]["speaking_rate"]).add_column("phonemes", rate_dataset[split]["phonemes"])
         if args.apply_squim_quality_estimation:
             dataset[split] = dataset[split].add_column("stoi", squim_dataset[split]["stoi"]).add_column("si-sdr", squim_dataset[split]["sdr"]).add_column("pesq", squim_dataset[split]["pesq"])
