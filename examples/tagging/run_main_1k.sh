@@ -11,7 +11,7 @@ python main.py "blabble-io/libritts_r" \
     --repo_id "ylacombe/libritts_r_tags"\
 
 python main.py "blabble-io/libritts_r" \
-    --configuration "ckean" \
+    --configuration "other" \
     --output_dir ./tmp_libritts_r_other/ \
     --text_column_name "text_normalized" \
     --audio_column_name "audio" \
