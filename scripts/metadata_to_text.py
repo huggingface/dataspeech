@@ -220,10 +220,10 @@ if __name__ == "__main__":
             
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names, dataset_configs):
-                tmp_dataset = load_dataset(dataset_name, dataset_config)
+                tmp_dataset = load_dataset(dataset_name, dataset_config, num_proc=args.cpu_num_workers)
                 dataset.append(tmp_dataset)
         else:
-            dataset = [load_dataset(args.dataset_name, args.configuration)]
+            dataset = [load_dataset(args.dataset_name, args.configuration, num_proc=args.cpu_num_workers)]
             dataset_configs = [args.configuration]
     else:
         if "+" in args.dataset_name:
@@ -240,11 +240,11 @@ if __name__ == "__main__":
             
             dataset = []
             for dataset_name, dataset_config in zip(dataset_names):
-                tmp_dataset = load_dataset(dataset_name)
+                tmp_dataset = load_dataset(dataset_name, num_proc=args.cpu_num_workers)
                 dataset.append(tmp_dataset)
 
         else:
-            dataset = [load_dataset(args.dataset_name)]
+            dataset = [load_dataset(args.dataset_name, num_proc=args.cpu_num_workers)]
 
     if args.plot_directory:
         Path(args.plot_directory).mkdir(parents=True, exist_ok=True)
