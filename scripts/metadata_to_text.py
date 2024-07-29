@@ -12,6 +12,8 @@ SPEAKER_RATE_BINS = ["very slowly", "quite slowly", "slightly slowly", "moderate
 SNR_BINS = ["very noisy", "quite noisy", "slightly noisy", "moderate ambient sound", "slightly clear", "quite clear", "very clear"]
 REVERBERATION_BINS = ["very roomy sounding", "quite roomy sounding", "slightly roomy sounding", "moderate reverberation", "slightly confined sounding", "quite confined sounding", "very confined sounding"]
 UTTERANCE_LEVEL_STD = ["very monotone", "quite monotone", "slightly monotone", "moderate intonation", "slightly expressive", "quite expressive", "very expressive"]
+SI_SDR_BINS = ["extremely noisy", "very noisy", "noisy", "slightly noisy", "almost no noise", "very clear"]
+PESQ_BINS = ["very bad speech quality", "bad speech quality", "slightly bad speech quality", "moderate speech quality", "great speech quality", "wonderful speech quality"]
 
 # this one is supposed to be apply to speaker-level mean pitch, and relative to gender
 SPEAKER_LEVEL_PITCH_BINS = ["very low pitch", "quite low pitch", "slightly low pitch", "moderate pitch", "slightly high pitch", "quite high pitch", "very high pitch"]
@@ -65,6 +67,8 @@ def bins_to_text(dataset, text_bins, column_name, output_column_name, leading_sp
         
         # filter out outliers
         values = np.array(values)
+        values = values[~np.isnan(values)]
+        filtered_values = values
         if std_tolerance is not None:
             filtered_values = values[np.abs(values - np.mean(values)) < std_tolerance * np.std(values)]
 
@@ -133,6 +137,8 @@ def speaker_level_relative_to_gender(dataset, text_bins, speaker_column_name, ge
 
         if only_save_plot:
             return dataset, bin_edges
+    else:
+        print(f"Already computed bin edges have been passed for {output_column_name}. Will use: {bin_edges}.")
      
     speaker_id_to_bins = dataframe.apply(lambda x: np.searchsorted(bin_edges[x[gender_column_name]], x[column_name]), axis=1).to_dict()
         
@@ -175,6 +181,10 @@ if __name__ == "__main__":
     parser.add_argument("--plot_directory", default=None, type=str, help="If specified, will save visualizing plots to this directory. Only used if `path_to_bin_edges=False`.")
     parser.add_argument("--only_save_plot", default=False, action="store_true", help="If `True` and `--plot_directory` is specified, will only compute plot. Only used if `path_to_bin_edges=False`.")
     parser.add_argument("--snr_lower_range", default=None, type=float, help="The lower range of the SNR bins")
+    parser.add_argument("--speaking_rate_lower_range", default=None, type=float, help="The lower range of the speaking rate bins")
+    parser.add_argument("--apply_squim_quality_estimation", action="store_true", help="If set, will also compute bins for torchaudio-squim estimation (SI-SNR, PESQ).")
+    parser.add_argument("--pesq_std_tolerance", default=None, type=float, help="Used if `apply_squim_quality_estimation=True`. Standard deviation tolerance for PESQ estimation. Any value that is outside mean ± std * tolerance is discared. Only used if `avoid_pitch_computation=False`.")
+    parser.add_argument("--sdr_std_tolerance", default=None, type=float, help="Used if `apply_squim_quality_estimation=True`. Standard deviation tolerance for SI-SDR estimation. Any value that is outside mean ± std * tolerance is discared. Only used if `path_to_bin_edges=False`.")
 
     args = parser.parse_args()
     
@@ -199,6 +209,10 @@ if __name__ == "__main__":
     reverberation_bins = text_bins_dict.get("reverberation_bins", REVERBERATION_BINS)
     utterance_level_std = text_bins_dict.get("utterance_level_std", UTTERANCE_LEVEL_STD)
     
+    if args.apply_squim_quality_estimation:
+        sdr_bins = text_bins_dict.get("sdr_bins", SI_SDR_BINS)
+        pesq_std = text_bins_dict.get("pesq_bins", PESQ_BINS)
+
     output_dirs = [args.output_dir] if args.output_dir is not None else None
     repo_ids = [args.repo_id] if args.repo_id is not None else None
     if args.configuration:
@@ -256,10 +270,14 @@ if __name__ == "__main__":
 
         dataset, pitch_bin_edges = speaker_level_relative_to_gender(dataset, speaker_level_pitch_bins, args.speaker_id_column_name, args.gender_column_name, "utterance_pitch_mean", "pitch", batch_size=args.batch_size, num_workers=args.cpu_num_workers, std_tolerance=args.pitch_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges)
 
-    dataset, speaking_rate_bin_edges = bins_to_text(dataset, speaker_rate_bins, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speaking_rate_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("speaking_rate",None))
+    dataset, speaking_rate_bin_edges = bins_to_text(dataset, speaker_rate_bins, "speaking_rate", "speaking_rate", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speaking_rate_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("speaking_rate",None), lower_range=args.speaking_rate_lower_range)
     dataset, noise_bin_edges = bins_to_text(dataset, snr_bins, "snr", "noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.snr_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("noise",None), lower_range=args.snr_lower_range)
     dataset, reverberation_bin_edges = bins_to_text(dataset, reverberation_bins, "c50", "reverberation", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.reverberation_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("reverberation",None))
     dataset, speech_monotony_bin_edges = bins_to_text(dataset, utterance_level_std, "utterance_pitch_std", "speech_monotony", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.speech_monotony_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("speech_monotony",None))
+
+    if args.apply_squim_quality_estimation:
+        dataset, sdr_bin_edges = bins_to_text(dataset, sdr_bins, "si-sdr", "sdr_noise", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.sdr_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("si-sdr",None))
+        dataset, pesq_bin_edges = bins_to_text(dataset, pesq_std, "pesq", "pesq_speech_quality", batch_size=args.batch_size, num_workers=args.cpu_num_workers, leading_split_for_bins=args.leading_split_for_bins, std_tolerance=args.pesq_std_tolerance, save_dir=args.plot_directory, only_save_plot=args.only_save_plot, bin_edges=bin_edges_dict.get("pesq",None))
 
     if args.save_bin_edges:
         bin_edges = {
@@ -271,6 +289,9 @@ if __name__ == "__main__":
         if not args.avoid_pitch_computation:
             bin_edges["pitch_bins_male"] = pitch_bin_edges["male"].tolist()
             bin_edges["pitch_bins_female"] = pitch_bin_edges["female"].tolist()
+        if args.apply_squim_quality_estimation:
+            bin_edges["si-sdr"] = sdr_bin_edges.tolist()
+            bin_edges["pesq"] = pesq_bin_edges.tolist()
         
         with open(args.save_bin_edges, "w") as outfile: 
             json.dump(bin_edges, outfile)
