@@ -6,7 +6,7 @@ Its aim is to provide a simple, clean codebase for applying audio transformation
 
 Its primary use is to reproduce the annotation method from Dan Lyth and Simon King's research paper [Natural language guidance of high-fidelity text-to-speech with synthetic annotations](https://arxiv.org/abs/2402.01912), that labels various speaker characteristics with natural language descriptions.
 
-Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts_r_tags_tagged_10k_generated), and a 10K hours subset of [the English version of MLS](https://huggingface.co/datasets/parler-tts/mls-eng-10k-tags_tagged_10k_generated).
+Applying these tools allows us to prepare and release tagged versions of [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts-r-filtered-speaker-descriptions), and of [the English version of MLS](https://huggingface.co/datasets/parler-tts/mls-eng-speaker-descriptions).
 
 This repository is designed to accompany the [Parler-TTS library](https://github.com/huggingface/parler-tts), which contains the inference and training code for Parler-TTS, a new family of high-quality text-to-speech models.
 
@@ -30,11 +30,14 @@ cd dataspeech
 pip install -r requirements.txt
 ```
 
+> [!WARNING]
+> The rest of the guide has yet to be adapted to the newest checkpoints.
+
 ## Annotating datasets to fine-tune Parler-TTS
 
 In the following examples, we'll load 30 hours of audio data from the [Jenny TTS dataset](https://github.com/dioco-group/jenny-tts-dataset), a high-quality mono-speaker TTS dataset, from an Irish female speaker named Jenny.
 
-The aim here is to create an annotated version of Jenny TTS, in order to fine-tune the [Parler-TTS v0.1 checkpoint](https://huggingface.co/parler-tts/parler_tts_mini_v0.1) on this dataset.
+The aim here is to create an annotated version of Jenny TTS, in order to fine-tune the [Parler-TTS v1 checkpoint](https://huggingface.co/parler-tts/parler-tts-mini-v1) on this dataset.
 
 Thanks to a [script similar to what's described in the FAQ](#how-do-i-use-datasets-that-i-have-with-this-repository), we've uploaded the dataset to the HuggingFace hub, under the name [reach-vb/jenny_tts_dataset](https://huggingface.co/datasets/reach-vb/jenny_tts_dataset).
 
@@ -68,11 +71,11 @@ python main.py "reach-vb/jenny_tts_dataset" \
 
 Note that the script will be faster if you have GPUs at your disposal. It will automatically scale-up to every GPUs available in your environnement.
 
-The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was push to [ylacombe/jenny-tts-tags](https://huggingface.co/datasets/ylacombe/jenny-tts-tags).
+The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was pushed to [ylacombe/jenny-tts-tags](https://huggingface.co/datasets/ylacombe/jenny-tts-tags).
 
 ### 2. Map annotations to text bins
 
-Since the ultimate goal here is to fine-tune the [Parler-TTS v0.1 checkpoint](https://huggingface.co/parler-tts/parler_tts_mini_v0.1) on the Jenny dataset, we want to stay consistent with the text bins of the datasets on which the latter model was trained.
+Since the ultimate goal here is to fine-tune the [Parler-TTS v1 checkpoint](https://huggingface.co/parler-tts/parler-tts-mini-v1) on the Jenny dataset, we want to stay consistent with the text bins of the datasets on which the latter model was trained.
 
 This is easy to do thanks to the following command:
 
@@ -370,9 +373,6 @@ If you found this repository useful, please consider citing this work and also t
       primaryClass={cs.SD}
 }
 ```
-
-## Status
-This library is still a WIP. Other utility scripts should come soon.
 
 ### TODOs
 - [ ] Accent classification training script
