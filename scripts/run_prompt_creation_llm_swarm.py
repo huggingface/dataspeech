@@ -157,6 +157,25 @@ class DataArguments:
     save_total_limit: Optional[int] = field(
         default=1, metadata={"help": ("If a value is passed, will limit the total number of saved checkpoints")}
     )
+    speaker_name: Optional[str] = field(
+        default=None,
+        metadata={"help": "If `is_single_speaker`, it specified the speaker name that you want to give to the mono-speaker of your dataset."},
+    )
+    is_single_speaker: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use a single speaker prompt, with a single name, specified by `speaker_name`."}
+    )
+    is_new_speaker_prompt: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use the newest speaker prompt, which will be used for the next Parler-TTS."}
+    )
+    speaker_id_column: Optional[str] = field(
+        default=None, metadata={"help": "Speaker id column name. Only used if creating a dataset with multiple speaker names (i.e if `speaker_ids_to_name_json` is specified)"}
+    )
+    speaker_ids_to_name_json: Optional[str] = field(
+        default=None, metadata={"help": "Path to a JSON file which map some speaker ids to some names. Only used if `speaker_id_column` is specified."}
+    )
+    accent_column: Optional[str] = field(
+        default=None, metadata={"help": "Accent column name, if any."}
+    )
 
     def __post_init__(self):
         if self.push_to_hub and self.hub_dataset_id is None:
@@ -231,34 +250,100 @@ def get_last_checkpoint(folder) -> Tuple[List, int]:
     return all_generated_ids, cur_step
 
 
-# TODO(SG): add accent
-EXPECTED_COLUMNS = {
-    "gender",
-    "pitch",
-    "noise",
-    "reverberation",
-    "speech_monotony",
-    "speaking_rate",
-}
 
 PROMPT = """You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
 1. The gender (e.g., male, female)
-2. The level of reverberation (e.g., very distant-sounding, quite distant-sounding, slightly distant-sounding, moderately balanced reverberation, slightly close-sounding, quite close-sounding, very close-sounding)
-3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, balanced in clarity, slightly clean, quite clean, very clean)
-4. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderately dynamic, slightly expressive and animated, quite expressive and animated, very expressive and animated)
+2. The level of reverberation (e.g., very roomy sounding, quite roomy sounding, slightly roomy sounding, moderate reverberation, slightly confined sounding, quite confined sounding, very confined sounding)
+3. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, moderate ambient sound, slightly clear, quite clear, very clear)
+4. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderate intonation, slightly expressive, quite expressive, very expressive)
 5. The pace of the speaker's delivery (e.g., very slowly, quite slowly, slightly slowly, moderate speed, slightly fast, quite fast, very fast)
-6. The pitch of the speaker's voice (e.g., very low-pitch, quite low-pitch, slightly low-pitch, moderate pitch, slightly high-pitch, quite high-pitch, very high-pitch)
+6. The pitch of the speaker's voice (e.g., very low pitch, quite low pitch, slightly low pitch, moderate pitch, slightly high pitch, quite high pitch, very high pitch)
+Your task is to create a text description using these keywords that accurately describes the speech sample while ensuring the description remains grammatically correct and easy to understand. You should rearrange the keyword order as necessary, and substitute synonymous terms where appropriate. If the amount of noise is 'very noisy' and the level of reverberation is 'very roomy sounding', include terms like 'very bad recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very confined sounding', include terms like 'very good recording' in the description. Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
+For example, given the following keywords: 'female', 'slightly roomy sounding', 'slightly noisy', 'very expressive', 'slightly low pitch', 'very slowly', a valid description would be: 'a woman with a deep voice speaks slowly but has an animated delivery in an echoey room with some background noise'.
+For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:"
+"""
 
-Your task is to create a text description using these keywords that accurately describes the speech sample. Ensure that the generated description is grammatically correct, easy to understand, and most importantly, concise. 
-You can optionally change the order of keywords, and replace synonymous terms. You can also optionally omit the following terms, as they are default terms: 'moderately balanced reverberation', 'balanced in clarity', 'moderately dynamic', 'moderate speed' and 'moderate pitch'.
-If the amount of noise is 'very noisy' and the level of reverberation is 'distant-sounding', you must include words such as 'very poor recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very close-sounding', you must include terms like 'very good recording' in the description. 
-Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
+NEW_PROMPT = """You will be given six descriptive keywords related to an audio sample of a person's speech. These keywords include:
+1. The gender (male, female)
+2. The level of reverberation (very distant-sounding, distant-sounding, slightly distant-sounding, slightly close-sounding, very close-sounding)
+3. The amount of noise in the sample (extremely noisy, very noisy, noisy, slightly noisy, almost no noise, very clear)
+4. The tone of the speaker's voice (very monotone, monotone, slightly expressive and animated, expressive and animated, very expressive and animated)
+5. The pace of the speaker's delivery (very slowly, slowly, slightly slowly, moderate speed, slightly fast, fast, very fast)
+6. The pitch of the speaker's voice (very low-pitch, low-pitch, slightly low-pitch, moderate pitch, slightly high-pitch, high-pitch, very high-pitch)
 
-For example, given the following keywords: 'female', 'slightly distant-sounding', 'slightly noisy', 'very expressive', 'moderate pitch', 'very slowly', a valid description would be: 'A woman with a moderately pitched voice speaks very slowly but has an animated delivery in an echoey room with some background noise.'.
-Another valid description would be: 'In a room with slight background noise, a female speaker delivers an animated and expressive speech,at a very slow pace.'
-Another valid description would be: 'A female voice enunciates an animated and expressive speech. Her voice is slightly distant-sounding, with some background noise present. She speaks very slowly with a moderate pitch but a very expressive tone.'
-For the keywords: '[gender]', '[reverberation]', '[noise]', '[speech_monotony]', '[pitch]', '[speaking_rate]', the corresponding description is:"""
+Your task is to create a text description using these keywords that accurately describes the speech sample.
+If the amount of noise is 'very noisy' and the level of reverberation is 'very distant-sounding', you must include terms such as 'very poor recording' or `very bad recording` in the description. 
+Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very close-sounding', you must include terms like 'very good recording' or `excellent recording` in the description. 
+You can randomly omit the following terms, as they are default terms: 'moderate speed' and 'moderate pitch'.
+Do not add extra details beyond what has been provided above. You can change the order of keywords, and replace synonymous terms.
 
+For example, given the following keywords: 'female', 'slightly distant-sounding', 'noisy', 'very expressive and animated', 'very slowly', 'moderate pitch', a valid description would be: 'A woman speaks very slowly but has a very animated delivery. The recording is noisy and there is some roominess.'
+Another valid description would be: 'In a noisy room, a female speaker delivers a very animated and expressive speech, at a very slow pace.'
+Another valid description would be: 'A woman enunciates a very expressive speech. Her voice is slightly distant-sounding, with some background noise present. She speaks very slowly with a moderate pitch but a very expressive tone.'
+
+Ensure that the generated description is grammatically correct, easy to understand, and concise. Only return one and only one description.
+
+For the keywords: '[gender]', '[reverberation]', '[sdr_noise]', '[speech_monotony]', '[speaking_rate]', '[pitch]', the corresponding description is:
+"""
+
+NEW_PROMPT_WITH_ACCENT = """You will be given 7 descriptive keywords related to an audio sample of a person's speech. These keywords include:
+1. The gender (male, female)
+2. The level of reverberation (very distant-sounding, distant-sounding, slightly distant-sounding, slightly close-sounding, very close-sounding)
+3. The amount of noise in the sample (extremely noisy, very noisy, noisy, slightly noisy, almost no noise, very clear)
+4. The tone of the speaker's voice (very monotone, monotone, slightly expressive and animated, expressive and animated, very expressive and animated)
+5. The pace of the speaker's delivery (very slowly, slowly, slightly slowly, moderate speed, slightly fast, fast, very fast)
+6. The pitch of the speaker's voice (very low-pitch, low-pitch, slightly low-pitch, moderate pitch, slightly high-pitch, high-pitch, very high-pitch)
+7. The accent of the speaker.
+
+Your task is to create a text description using these keywords that accurately describes the speech sample.
+If the amount of noise is 'very noisy' and the level of reverberation is 'very distant-sounding', you must include terms such as 'very poor recording' or `very bad recording` in the description. 
+Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very close-sounding', you must include terms like 'very good recording' or `excellent recording` in the description. 
+You can randomly omit the following terms, as they are default terms: 'moderate speed' and 'moderate pitch'.
+Do not add extra details beyond what has been provided above. You can change the order of keywords, and replace synonymous terms.
+
+For example, given the following keywords: 'female', 'slightly distant-sounding', 'noisy', 'very expressive and animated', 'very slowly', 'moderate pitch', 'Chinese', a valid description would be: 'A woman with a Chinese accent speaks very slowly but has a very animated delivery. The recording is noisy and there is some roominess.'
+Another valid description would be: 'In a noisy room, a female speaker with a Chinese accent delivers a very animated and expressive speech, at a very slow pace.'
+Another valid description would be: 'A woman with a Chinese accent enunciates a very expressive speech. Her voice is slightly distant-sounding, with some background noise present. She speaks very slowly with a moderate pitch but a very expressive tone.'
+
+Ensure that the generated description is grammatically correct, easy to understand, and concise. Only return one and only one description.
+
+For the keywords: '[gender]', '[reverberation]', '[sdr_noise]', '[speech_monotony]', '[speaking_rate]', '[pitch]', '[accent]', the corresponding description is:
+"""
+
+
+NEW_SINGLE_SPEAKER_PROMPT = """You will be given four descriptive keywords related to an audio sample of [speaker_name]'s speech. These keywords include:
+1. The level of reverberation (very distant-sounding, distant-sounding, slightly distant-sounding, slightly close-sounding, very close-sounding)
+3. The amount of noise in the sample (extremely noisy, very noisy, noisy, slightly noisy, almost no noise, very clear)
+3. The tone of the speaker's voice (very monotone, monotone, slightly expressive and animated, expressive and animated, very expressive and animated)
+4. The pace of the speaker's delivery (very slowly, slowly, slightly slowly, moderate speed, slightly fast, fast, very fast)
+
+Your task is to create a text description using these keywords that accurately describes [speaker_name]'s speech sample.
+If the amount of noise is 'very noisy' and the level of reverberation is 'very distant-sounding', you must include terms such as 'very poor recording' or `very bad recording` in the description. 
+Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very close-sounding', you must include terms like 'very good recording' or `excellent recording` in the description. 
+You can randomly omit the following terms, as they are default terms: 'moderate speed' and 'moderate pitch'.
+Do not add extra details beyond what has been provided above. You can change the order of keywords, and replace synonymous terms.
+
+For example, given the following keywords: 'slightly distant-sounding', 'clear', 'very expressive and animated', 'slightly fast', a valid description would be: '[speaker_name] speaks slightly fast but has a very animated delivery in a room with slight echo but no background noise.'
+Another valid description would be: `In a very animated voice, [speaker_name] delivers words slightly quickly. The room is quite, but there's a bit of echo.'
+
+Ensure that the generated description is grammatically correct, easy to understand, and concise. Only return one and only one description.
+
+For the keywords: ''[reverberation]', '[sdr_noise]', '[speech_monotony]', '[speaking_rate]', the corresponding description is:
+"""
+
+SINGLE_SPEAKER_PROMPT = """You will be given four descriptive keywords related to an audio sample of [speaker_name]'s speech. These keywords include:
+1. The level of reverberation (e.g., very roomy sounding, quite roomy sounding, slightly roomy sounding, moderate reverberation, slightly confined sounding, quite confined sounding, very confined sounding)
+2. The amount of noise the sample (e.g., very noisy, quite noisy, slightly noisy, moderate ambient sound, slightly clear, quite clear, very clear)
+3. The tone of the speaker's voice (e.g., very monotone, quite monotone, slightly monotone, moderate intonation, slightly expressive, quite expressive, very expressive)
+4. The pace of the speaker's delivery (e.g., very slowly, quite slowly, slightly slowly, moderate speed, slightly fast, quite fast, very fast)
+
+Your task is to create a single and only short text description using these keywords that accurately describes the speech sample while ensuring the description remains grammatically correct and easy to understand. You should rearrange the keyword order as necessary, and substitute synonymous terms where appropriate. If the amount of noise is 'very noisy' and the level of reverberation is 'very roomy sounding', you must include terms like 'very bad recording' in the description. Likewise, if the amount of noise is 'very clear' and the level of reverberation is 'very confined sounding', you must include terms like 'very good recording' in the description. Otherwise, do not add extra details beyond what has been provided, and only return the generated description.
+
+For example, given the following keywords: 'slightly roomy sounding', 'quite noisy', 'very expressive', 'very slowly', a valid description would be: '[speaker_name] speaks very slowly but has an animated delivery in an echoey room with background noise.'.
+Feel free to change the order of keywords, and to use synonyms, for example, with the previous keywords: `In a very expressive voice, [speaker_name] pronounces her words incredibly slowly. There's some background noise in this room with a bit of echo.'.
+
+For the keywords: ''[reverberation]', '[noise]', '[speech_monotony]', '[speaking_rate]', the corresponding description is:
+"""
 
 # 1. Parse input arguments
 parser = HfArgumentParser((ModelArguments, DataArguments))
@@ -271,6 +356,36 @@ if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
 else:
     model_args, data_args = parser.parse_args_into_dataclasses()
 
+if data_args.is_single_speaker and data_args.speaker_name is None:
+    raise ValueError("`is_single_speaker=True` but `speaker_name` is not specified. Specify it or remove `is_single_speaker`.")
+
+if not data_args.is_single_speaker and data_args.speaker_name:
+    raise ValueError(f"`is_single_speaker=False` but `speaker_name=data_args.speaker_name` is not specified. Add `--is_single_speaker` or remove `speaker_name`.")
+
+EXPECTED_COLUMNS = {"gender", "pitch", "noise", "reverberation", "speech_monotony", "speaking_rate"}
+if data_args.is_single_speaker:
+    EXPECTED_COLUMNS = {"noise", "reverberation", "speech_monotony", "speaking_rate"}
+    
+if data_args.is_new_speaker_prompt:
+    EXPECTED_COLUMNS.remove("noise")
+    EXPECTED_COLUMNS.add("sdr_noise")
+
+speaker_ids_to_name = {}
+speaker_id_column = data_args.speaker_id_column
+if data_args.speaker_id_column and data_args.speaker_ids_to_name_json:
+    import json
+    if data_args.is_single_speaker:
+        raise ValueError(f"`is_single_speaker=True` but `speaker_ids_to_name_json={data_args.speaker_ids_to_name_json}`. Specify one or another.")
+    
+    EXPECTED_COLUMNS.add(data_args.speaker_id_column)
+    with open(data_args.speaker_ids_to_name_json, "r") as read_file:
+        speaker_ids_to_name = json.load(read_file)
+
+speaker_name = data_args.speaker_name
+is_single_speaker = data_args.is_single_speaker
+is_new_speaker_prompt = data_args.is_new_speaker_prompt
+accent_column_name = data_args.accent_column
+    
 with LLMSwarm(
     LLMSwarmConfig(
         instances=model_args.num_instances,
@@ -292,8 +407,22 @@ with LLMSwarm(
 
     async def process_text(sample):
         sample_prompt = PROMPT
+        if is_single_speaker:
+            sample_prompt = SINGLE_SPEAKER_PROMPT if not is_new_speaker_prompt else NEW_SINGLE_SPEAKER_PROMPT
+            sample_prompt = sample_prompt.replace(f"[speaker_name]", speaker_name)
+        elif (speaker_id_column and speaker_ids_to_name.get(str(sample.get(speaker_id_column)), None)):
+            name =  speaker_ids_to_name.get(str(sample.get(speaker_id_column)), None)
+            sample_prompt = SINGLE_SPEAKER_PROMPT if not is_new_speaker_prompt else NEW_SINGLE_SPEAKER_PROMPT
+            sample_prompt = sample_prompt.replace(f"[speaker_name]", name)
+        elif is_new_speaker_prompt and accent_column_name is not None:
+            sample_prompt = NEW_PROMPT if sample.get(accent_column_name, "Unindentified") == "Unindentified" else NEW_PROMPT_WITH_ACCENT
+        elif is_new_speaker_prompt:
+            sample_prompt = NEW_PROMPT
         for key in EXPECTED_COLUMNS:
             sample_prompt = sample_prompt.replace(f"[{key}]", sample[key])
+        if accent_column_name is not None and sample.get(accent_column_name, "Unindentified") != "Unindentified":
+            sample_prompt = sample_prompt.replace("[accent]", sample["accent"])
+
         sample_prompt = [{"role": "user", "content": sample_prompt}]
         sample_prompt = tokenizer.apply_chat_template(sample_prompt, tokenize=False)
         attempt = 0
