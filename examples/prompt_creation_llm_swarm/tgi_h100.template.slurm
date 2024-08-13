@@ -8,7 +8,7 @@
 
 # START EDIT
 source ~/.bashrc
-VOLUME="/fsx/sanchit/.cache"
+VOLUME="/fsx/yoach/.cache"
 # END EDIT
 
 export model={{model}}
@@ -45,7 +45,7 @@ srun --container-image='ghcr.io#huggingface/text-generation-inference:2.0' \
     /usr/local/bin/text-generation-launcher \
     --model-id $model \
     --revision $revision \
-    --max-concurrent-requests 2000 \
+    --max-concurrent-requests 2500 \
     --max-total-tokens {{model_max_length}} \
     --max-input-length {{model_input_length}} \
     --max-batch-prefill-tokens {{model_max_length}} \

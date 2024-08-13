@@ -18,6 +18,7 @@ This repository is designed to accompany the [Parler-TTS library](https://github
 * [Annotating datasets from scratch](#annotating-datasets-from-scratch)
 * [Using Data-Speech to filter your speech datasets](#using-data-speech-to-filter-your-speech-datasets)
 * [❓ FAQ](#faq)
+* [Logs](#logs)
 
 
 ## Set-up
@@ -29,9 +30,6 @@ git clone git@github.com:huggingface/dataspeech.git
 cd dataspeech
 pip install -r requirements.txt
 ```
-
-> [!WARNING]
-> The rest of the guide has yet to be adapted to the newest checkpoints.
 
 ## Annotating datasets to fine-tune Parler-TTS
 
@@ -55,7 +53,7 @@ We'll:
 
 We'll use [`main.py`](main.py) to get the following continuous variables:
     - Speaking rate `(nb_phonemes / utterance_length)`
-    - Signal-to-noise ratio (SNR)
+    - Scale-Invariant Signal-to-Distortion Ratio (SI-SDR) 
     - Reverberation
     - Speech monotony
 
@@ -66,12 +64,13 @@ python main.py "reach-vb/jenny_tts_dataset" \
   --audio_column_name "audio" \
   --cpu_num_workers 8 \
   --rename_column \
-  --repo_id "jenny-tts-tags"
+  --repo_id "jenny-tts-tags-v1" \
+  --apply_squim_quality_estimation
 ```
 
 Note that the script will be faster if you have GPUs at your disposal. It will automatically scale-up to every GPUs available in your environnement.
 
-The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was pushed to [ylacombe/jenny-tts-tags](https://huggingface.co/datasets/ylacombe/jenny-tts-tags).
+The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was pushed to [ylacombe/jenny-tts-tags-v1](https://huggingface.co/datasets/ylacombe/jenny-tts-tags-v1).
 
 ### 2. Map annotations to text bins
 
@@ -81,26 +80,28 @@ This is easy to do thanks to the following command:
 
 ```sh
 python ./scripts/metadata_to_text.py \
-    "ylacombe/jenny-tts-tags" \
-    --repo_id "jenny-tts-tags" \
+    "ylacombe/jenny-tts-tags-v1" \
+    --repo_id "jenny-tts-tags-v1" \
     --configuration "default" \
     --cpu_num_workers "8" \
-    --path_to_bin_edges "./examples/tags_to_annotations/v01_bin_edges.json" \
-    --avoid_pitch_computation
+    --path_to_bin_edges "./examples/tags_to_annotations/v02_bin_edges.json" \
+    --path_to_text_bins "./examples/tags_to_annotations/v02_text_bins.json" \
+    --avoid_pitch_computation \
+    --apply_squim_quality_estimation
 ```
 
-Thanks to [`v01_bin_edges.json`](/examples/tags_to_annotations/v01_bin_edges.json), we don't need to recompute bins from scratch and the above script takes a few seconds.
+Thanks to [`v02_bin_edges.json`](/examples/tags_to_annotations/v02_bin_edges.json), we don't need to recompute bins from scratch and the above script takes a few seconds.
 
-The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was push to [ylacombe/jenny-tts-tags](https://huggingface.co/datasets/ylacombe/jenny-tts-tags).
+The resulting dataset will be pushed to the HuggingFace hub under your HuggingFace handle. Mine was push to [ylacombe/jenny-tts-tags-v1](https://huggingface.co/datasets/ylacombe/jenny-tts-tags-v1).
 
-You can notice that text bins such as `slightly noisy`, `quite monotone` have been added to the samples.
+You can notice that text bins such as `slightly slowly`, `very monotone` have been added to the samples.
 
 ### 3. Create natural language descriptions from those text bins
 
 Now that we have text bins associated to the Jenny dataset, the next step is to create natural language descriptions out of the few created features.
 
 Here, we decided to create prompts that use the name `Jenny`, prompts that'll look like the following:
-`In a very expressive voice, Jenny pronounces her words incredibly slowly. There's some background noise in this room with a bit of echo'`
+`In a very expressive voice, Jenny pronounces her words incredibly slowly. There's some background noise in this room with a bit of echo.'`
 
 This step generally demands more resources and times and should use one or many GPUs.
 
@@ -110,23 +111,28 @@ This step generally demands more resources and times and should use one or many 
 python ./scripts/run_prompt_creation.py \
   --speaker_name "Jenny" \
   --is_single_speaker \
-  --dataset_name "ylacombe/jenny-tts-tags" \
+  --is_new_speaker_prompt \
+  --dataset_name "ylacombe/jenny-tts-tags-v1" \
   --dataset_config_name "default" \
   --model_name_or_path "mistralai/Mistral-7B-Instruct-v0.2" \
-  --per_device_eval_batch_size 32 \
+  --per_device_eval_batch_size 128 \
   --attn_implementation "sdpa" \
-  --dataloader_num_workers 8 \
   --output_dir "./tmp_jenny" \
   --load_in_4bit \
   --push_to_hub \
-  --hub_dataset_id "jenny-tts-10k-tagged" \
-  --preprocessing_num_workers 16
+  --hub_dataset_id "jenny-tts-tagged-v1" \
+  --preprocessing_num_workers 24 \
+  --dataloader_num_workers 24
 ```
 
 As usual, we precise the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used a version of Mistral's 7B model.
 
 > [!NOTE]
-> If you want to use this on a multi-speaker dataset, you'd have to adapt the logic of the script.
+> If you want to use this on a multi-speaker dataset, you'll have to adapt the logic of the script. First, you need to remove the `--is_single_speaker` and `--speaker_name "Jenny"` flags.
+> 
+> Then, there's two cases:
+> 1. In case you want to associate names to some speakers, you need to pass the speaker id column name, and a JSON file which maps the speaker ids to these names. For example, `--speaker_id_column "speaker_id" --speaker_ids_to_name_json ./examples/prompt_creation/speaker_ids_to_names.json`. Feel free to take a look at [speaker_ids_to_names.json](examples/prompt_creation/speaker_ids_to_names.json) to get inspiration.
+> 2. In case you don't want to associate names to speakers, you don't have to do anything else. 
 
 
 ## Annotating datasets from scratch
@@ -138,32 +144,32 @@ description of the spoken audio characteristics.
 There are 3 steps to be completed in order to generate annotations:
 1. [Annotate the speech dataset](#predict-annotations) to get the following continuous variables:
     - Speaking rate `(nb_phonemes / utterance_length)`
-    - Signal-to-noise ratio (SNR)
+    - Scale-Invariant Signal-to-Distortion Ratio (SI-SDR) 
     - Reverberation
-    - Pitch estimation
+    - Speech monotony
 2. [Map the previous annotations categorical to discrete keywords bins](#map-continuous-annotations-to-key-words)
 3. [Create natural language descriptions from a set of keywords](#generate-natural-language-descriptions)
 
 
 ### 1. Predict annotations
 
-For the time being, [`main.py`](main.py) can be used to generate speaking rate, SNR, reverberation and pitch estimation. 
+For the time being, [`main.py`](main.py) can be used to generate speaking rate, SNR, reverberation, PESQ, SI-SDR and pitch estimation. 
 
 To use it, you need a dataset from the [datasets](https://huggingface.co/docs/datasets/v2.17.0/en/index) library, either locally or on the [hub](https://huggingface.co/datasets).
 
 
 ```sh
 python main.py "blabble-io/libritts_r" \
---configuration "dev" \
---output_dir ./tmp_libritts_r_dev/ \
---text_column_name "text_normalized" \
---audio_column_name "audio" \
---cpu_num_workers 8 \
---num_workers_per_gpu 4 \
---rename_column \
+  --configuration "dev" \
+  --output_dir ./tmp_libritts_r_dev/ \
+  --text_column_name "text_normalized" \
+  --audio_column_name "audio" \
+  --cpu_num_workers 8 \
+  --rename_column \
+  --apply_squim_quality_estimation
 ```
 
-Here, we've used 8 processes for operations that don't use GPUs, namely to compute the speaking rate. If GPUs were present in the environnement, `num_workers_per_gpu` precises the number of processes per GPUs for the operations that can be computed on GPUs - namely pitch, SNR and reverberation estimation.
+Here, we've used 8 processes for operations that don't use GPUs, namely to compute the speaking rate. If GPUs were present in the environnement, the operations that can be computed on GPUs - namely pitch, SNR and reverberation estimation - will use every GPUs available in the environnement.
 
 You can learn more about the arguments you can pass to `main.py` by passing:
 
@@ -171,7 +177,7 @@ You can learn more about the arguments you can pass to `main.py` by passing:
 python main.py --help
 ```
 
-In [`/examples/tagging/run_main_1k.sh`](/examples/tagging/run_main_1k.sh), we scaled up the initial command line to the whole dataset. Note that we've used the `repo_id` argument to push the dataset to the hub, resulting in [this dataset](https://huggingface.co/datasets/ylacombe/libritts_r_tags).
+In [`/examples/tagging/run_main_1k.sh`](/examples/tagging/run_main_1k.sh), we scaled up the initial command line to the whole dataset. Note that we've used the `repo_id` argument to push the dataset to the hub, resulting in [this dataset](https://huggingface.co/datasets/ylacombe/libritts-r-text-tags-v3).
 
 The dataset viewer gives an idea of what has been done, namely:
 - new columns were added:
@@ -181,6 +187,7 @@ The dataset viewer gives an idea of what has been done, namely:
     - `c50`: Reverberation estimation
     - `speaking_rate`
     - `phonemes`: which was used to compute the speaking rate
+    - `pesq` and `si-sdr`: which measure intelligibility and a proxy of noise, as indicated [here](https://pytorch.org/audio/main/tutorials/squim_tutorial.html)
 - the audio column was removed - this is especially useful when dealing with big datasets, as writing and pushing audio data can become a bottleneck.
 
 ![image](https://github.com/ylacombe/dataspeech/assets/52246514/f422a728-f2af-4c8f-bf2a-65c6722bc0c6)
@@ -194,14 +201,15 @@ The next step is to map the continuous annotations from the previous steps to ke
 - A speaker's pitch is calculated by averaging the pitches across its voice clips. The computed pitch estimator is then compared to speakers of the same gender to derive the pitch keyword of the speaker(very high-pitched to very low-pitched).
 - The rest of the keywords are derived by [computing histograms](https://numpy.org/doc/stable/reference/generated/numpy.histogram.html) of the continuous variables over all training samples, from which the extreme values have been eliminated, and associating a keyword with each bin.
 
-
 ```sh
-python ./scripts/metadata_to_text.py "ylacombe/libritts_r_tags+ylacombe/libritts_r_tags" \
+python ./scripts/metadata_to_text.py "ylacombe/libritts-r-text-tags-v3+ylacombe/libritts-r-text-tags-v3" \
 --configuration "clean+other" \
 --output_dir "./tmp_tts_clean+./tmp_tts_other" \
 --cpu_num_workers "8" \
 --leading_split_for_bins "train" \
 --plot_directory "./plots/" \
+--path_to_text_bins "./examples/tags_to_annotations/v02_text_bins.json" \
+--apply_squim_quality_estimation \
 ```
 Note how we've been able to pass different datasets with different configurations by separating the relevant arguments with `"+"`.
 
@@ -248,12 +256,15 @@ accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_promp
   --output_dir "./" \
   --load_in_4bit \
   --push_to_hub \
-  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated"
+  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated" \
+  --is_new_speaker_prompt \
 ```
 
 As usual, we define the dataset name and configuration we want to annotate. `model_name_or_path` should point to a `transformers` model for prompt annotation. You can find a list of such models [here](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers&sort=trending). Here, we used an instruction-tuned version of Meta's LLaMA-3 8B model. Should you use LLaMA or Gemma, you can enable torch compile with the flag `--torch_compile` for up to 1.5x faster inference.
 
-The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains more examples.
+The folder [`examples/prompt_creation/`](examples/prompt_creation/) contains more examples. 
+
+In particular, (`run_prompt_creation_1k_with_speaker_consistency.sh`)[examples/prompt_creation/run_prompt_creation_1k_with_speaker_consistency.sh] adapts the previous example but introduces speaker consistency. Here, "speaker consistency" simply means associating certain speakers with specific names. In this case, all descriptions linked to these speakers will specify their names, rather than generating anonymous descriptions.
 
 
 > [!TIP]
@@ -291,7 +302,7 @@ which is a template configuration for the Hugging Face H100 cluster. You can upd
 
 ### To conclude
 
-In the [`/examples`](/examples/) folder, we applied this recipe to both [10K hours of MLS Eng](https://huggingface.co/datasets/parler-tts/mls-eng-10k-tags_tagged_10k_generated) and [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts_r_tags_tagged_10k_generated). The resulting datasets were used to train [Parler-TTS](https://github.com/huggingface/parler-tts), a new text-to-speech model.
+In the [`/examples`](/examples/) folder, we applied this recipe to both [MLS Eng](https://huggingface.co/datasets/parler-tts/mls-eng-speaker-descriptions) and [LibriTTS-R](https://huggingface.co/datasets/parler-tts/libritts-r-filtered-speaker-descriptions). The resulting datasets were used to train [Parler-TTS](https://github.com/huggingface/parler-tts), a new text-to-speech model.
 
 This recipe is both scalable and easily modifiable and will hopefully help the TTS research community explore new ways of conditionning speech synthesis. 
 
@@ -338,6 +349,15 @@ dataset.push_to_hub(REPO_ID)
 Note that you can make the dataset private by passing [`private=True`](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub.private) to the [`push_to_hub`](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub) method. Find other possible arguments [here](https://huggingface.co/docs/datasets/v2.19.0/en/package_reference/main_classes#datasets.DatasetDict.push_to_hub).
 
 When using Data-Speech, you can then use `REPO_ID` (replace this by the name you want here and above) as the dataset name.
+
+## Logs
+
+
+* [August 2024]: Updated version of Data-Speech, suited for Parler-TTS v1
+  * New measures: Pesq and SI-SDR, the latter being used for better noise estimation
+  * Improved prompts
+  * Prompt creation can deal with speaker consistency and accents
+* [April 2024]: Release of the first version of Data-Speech 
 
 
 ## Acknowledgements

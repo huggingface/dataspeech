@@ -9,7 +9,7 @@ def squim_apply(batch, rank=None, audio_column_name="audio"):
     global model
     if model is None:
         model = SQUIM_OBJECTIVE.get_model()
-    if rank is not None:
+    if rank is not None or torch.cuda.device_count() > 0:
         # move the model to the right GPU if not there already
         device = f"cuda:{(rank or 0)% torch.cuda.device_count()}"
         # move to device and create pipeline here because the pipeline moves to the first GPU it finds anyway
