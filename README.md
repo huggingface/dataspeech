@@ -354,6 +354,11 @@ When using Data-Speech, you can then use `REPO_ID` (replace this by the name you
 ## Logs
 
 
+* [August 2024]: Updated version of Data-Speech, suited for Parler-TTS v1
+  * New measures: Pesq and SI-SDR, the latter being used for better noise estimation
+  * Improved prompts
+  * Prompt creation can deal with speaker consistency and accents
+* [April 2024]: Release of the first version of Data-Speech 
 
 
 ## Acknowledgements
