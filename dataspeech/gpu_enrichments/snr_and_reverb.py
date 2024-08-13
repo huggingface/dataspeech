@@ -15,7 +15,7 @@ def snr_apply(batch, rank=None, audio_column_name="audio", batch_size=32):
             Path(hf_hub_download(repo_id="ylacombe/brouhaha-best", filename="best.ckpt")),
             strict=False,
         )
-    if rank is not None:
+    if rank is not None or torch.cuda.device_count() > 0:
         # move the model to the right GPU if not there already
         device = f"cuda:{(rank or 0)% torch.cuda.device_count()}"
         # move to device and create pipeline here because the pipeline moves to the first GPU it finds anyway

@@ -10,7 +10,9 @@ accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_promp
   --output_dir "./" \
   --push_to_hub \
   --is_new_speaker_prompt \
-  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated"
+  --speaker_id_column 'speaker_id' \
+  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated" \
+  --speaker_ids_to_name_json ./examples/prompt_creation/speaker_ids_to_names.json \
 
 accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_prompt_creation.py \
   --dataset_name "parler-tts/libritts-r-tags-and-text" \
@@ -22,4 +24,7 @@ accelerate launch --multi_gpu --mixed_precision=fp16 --num_processes=8 run_promp
   --output_dir "./" \
   --push_to_hub \
   --is_new_speaker_prompt \
-  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated"
+  --speaker_id_column 'speaker_id' \
+  --hub_dataset_id "parler-tts/libritts-r-tags-and-text-generated" \
+  --speaker_ids_to_name_json ./examples/prompt_creation/speaker_ids_to_names.json \
+
