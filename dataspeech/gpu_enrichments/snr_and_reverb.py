@@ -46,7 +46,7 @@ def snr_apply(batch, rank=None, audio_column_name="audio", batch_size=32):
             
             snr.append(res["snr"][mask].mean())
             c50.append(res["c50"][mask].mean())
-            vad_durations.append(vad_duration)
+            vad_durations.append(np.float32(vad_duration))
         
         # 16ms window
         batch["snr"] = snr
