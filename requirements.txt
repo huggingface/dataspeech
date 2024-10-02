@@ -7,3 +7,4 @@ transformers
 accelerate
 bitsandbytes
 deepmultilingualpunctuation
+spacy
