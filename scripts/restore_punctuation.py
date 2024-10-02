@@ -113,11 +113,27 @@ if __name__ == "__main__":
     else:
         dataset = load_dataset(args.dataset_name, num_proc=args.cpu_num_workers)
 
-    supported_languages = {"catalan", "english", "german", "french", "spanish", "bulgarian", "italian", "polish", "dutch", "czech", "portuguese", "slovak", "slovenian"}
+    language_to_code = {
+        "catalan": "ca",
+        "english": "en",
+        "german": "de",
+        "french": "fr",
+        "spanish": "es",
+        "bulgarian": "bg",
+        "italian": "it",
+        "polish": "pl",
+        "dutch": "nl",
+        "czech": "cs",
+        "portuguese": "pt",
+        "slovak": "sk",
+        "slovenian": "sl"
+    }
+
+    supported_languages = set(language_to_code.keys())
     if args.language and args.language.lower() not in supported_languages:
         raise ValueError(f"Language {args.language} is not supported. Please choose from: {', '.join(supported_languages)}")
     
-    lang_code = args.language.lower()[:2] if args.language else 'en'  # Default to English if no language is specified
+    lang_code = language_to_code[args.language.lower()] if args.language else 'en'
 
     if lang_code == "ca":    
         punctuation_model = PunctuationModel(model="softcatala/fullstop-catalan-punctuation-prediction")
