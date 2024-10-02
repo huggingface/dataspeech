@@ -3,7 +3,8 @@ from multiprocessing import set_start_method
 from datasets import load_dataset
 from deepmultilingualpunctuation import PunctuationModel
 import spacy
-from typing import Dict, Callable
+from typing import Dict, Callable, List
+import re
 
 nlp_models: Dict[str, spacy.language.Language] = {}
 
@@ -70,39 +71,66 @@ def true_case(text: str, lang_code: str) -> str:
     
     return true_cased_text
 
-def apply_processing(examples, punctuation_model, text_column, lang_code, punctuation_only, truecase_only):
-    if punctuation_only:
-        processed_texts = [punctuation_model.restore_punctuation(text) for text in examples[text_column]]
-    elif truecase_only:
-        processed_texts = [true_case(text, lang_code) for text in examples[text_column]]
-    else:
-        restored_texts = [punctuation_model.restore_punctuation(text) for text in examples[text_column]]
-        processed_texts = [true_case(text, lang_code) for text in restored_texts]
+def remove_quotes(text: str) -> str:
+    """Remove single and double quotes from the input text."""
+    return re.sub(r"['\"]", "", text)
+
+def apply_processing(examples, punctuation_model, text_column, description_column, lang_code, punctuation_only, truecase_only):
+    result = {}
     
-    return {
-        f"original_{text_column}": examples[text_column],
-        text_column: processed_texts
-    }
+    # Process text column
+    if text_column:
+        if punctuation_only:
+            processed_texts = [punctuation_model.restore_punctuation(text) for text in examples[text_column]]
+        elif truecase_only:
+            processed_texts = [true_case(text, lang_code) for text in examples[text_column]]
+        else:
+            restored_texts = [punctuation_model.restore_punctuation(text) for text in examples[text_column]]
+            processed_texts = [true_case(text, lang_code) for text in restored_texts]
+        
+        result[f"original_{text_column}"] = examples[text_column]
+        result[text_column] = processed_texts
+    
+    # Process description column
+    if description_column:
+        if punctuation_only:
+            processed_descriptions = [remove_quotes(punctuation_model.restore_punctuation(text)) for text in examples[description_column]]
+        elif truecase_only:
+            processed_descriptions = [remove_quotes(true_case(text, lang_code)) for text in examples[description_column]]
+        else:
+            restored_descriptions = [punctuation_model.restore_punctuation(text) for text in examples[description_column]]
+            processed_descriptions = [remove_quotes(true_case(text, lang_code)) for text in restored_descriptions]
+        
+        result[f"original_{description_column}"] = examples[description_column]
+        result[description_column] = processed_descriptions
+    
+    return result
 
 if __name__ == "__main__":
     set_start_method("spawn")
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("dataset_name", type=str, help="Path or name of the dataset. See: https://huggingface.co/docs/datasets/v2.17.0/en/package_reference/loading_methods#datasets.load_dataset.path")
+    parser.add_argument("dataset_name", type=str, help="Path or name of the dataset.")
     parser.add_argument("--configuration", default=None, type=str, help="Dataset configuration to use, if necessary.")
     parser.add_argument("--output_dir", default=None, type=str, help="If specified, save the dataset on disk with this path.")
     parser.add_argument("--repo_id", default=None, type=str, help="If specified, push the dataset to the hub.")
-    parser.add_argument("--text_column", default="text", type=str, help="Name of the column containing the text to be processed.")
+    parser.add_argument("--text_column", default="text", type=str, help="Name of the column containing the main text to be processed.")
+    parser.add_argument("--description_column", default="text_description", type=str, help="Name of the column containing the description text to be processed.")
     parser.add_argument("--language", default=None, type=str, help="Language of the dataset. If not specified, uses the default multilingual model.")
     parser.add_argument("--batch_size", default=32, type=int, help="This parameter specifies how many samples are passed by workers for operations that are using GPUs.")
     parser.add_argument("--cpu_num_workers", default=1, type=int, help="Number of CPU workers for transformations that don't use GPUs or if no GPU are available.")
     parser.add_argument("--punctuation_only", action="store_true", help="If set, only perform punctuation restoration.")
     parser.add_argument("--truecase_only", action="store_true", help="If set, only perform true casing.")
+    parser.add_argument("--process_text_only", action="store_true", help="If set, only process the text column.")
+    parser.add_argument("--process_description_only", action="store_true", help="If set, only process the description column.")
 
     args = parser.parse_args()
 
     if args.punctuation_only and args.truecase_only:
         raise ValueError("Cannot set both --punctuation_only and --truecase_only. Choose one or neither.")
+
+    if args.process_text_only and args.process_description_only:
+        raise ValueError("Cannot set both --process_text_only and --process_description_only. Choose one or neither.")
 
     if args.configuration:
         dataset = load_dataset(args.dataset_name, args.configuration, num_proc=args.cpu_num_workers)
@@ -134,13 +162,18 @@ if __name__ == "__main__":
     else:
         punctuation_model = PunctuationModel(model="kredor/punctuate-all")
 
+    # Determine which columns to process
+    text_column = args.text_column if not args.process_description_only else None
+    description_column = args.description_column if not args.process_text_only else None
+
     processed_dataset = dataset.map(
         apply_processing,
         batched=True,
         batch_size=args.batch_size,
         fn_kwargs={
             "punctuation_model": punctuation_model,
-            "text_column": args.text_column,
+            "text_column": text_column,
+            "description_column": description_column,
             "lang_code": lang_code,
             "punctuation_only": args.punctuation_only,
             "truecase_only": args.truecase_only
@@ -159,9 +192,12 @@ if __name__ == "__main__":
         else:
             processed_dataset.push_to_hub(args.repo_id)
 
+    print("Processing completed for the following columns:", ", ".join(filter(None, [text_column, description_column])))
     if args.punctuation_only:
-        print("Punctuation restoration completed.")
+        print("Operation: Punctuation restoration")
     elif args.truecase_only:
-        print("True casing completed.")
+        print("Operation: True casing")
     else:
-        print("Punctuation restoration and true casing completed.")
+        print("Operation: Punctuation restoration and true casing")
+    if description_column:
+        print("Note: Single and double quotes were removed from the description column")
