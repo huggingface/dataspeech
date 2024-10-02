@@ -16,14 +16,10 @@ def load_spacy_model(lang_code: str) -> spacy.language.Language:
             'de': 'de_core_news_sm',
             'fr': 'fr_core_news_sm',
             'es': 'es_core_news_sm',
-            'bg': 'bg_core_news_sm',
             'it': 'it_core_news_sm',
             'pl': 'pl_core_news_sm',
             'nl': 'nl_core_news_sm',
-            'cs': 'cs_core_news_sm',
             'pt': 'pt_core_news_sm',
-            'sk': 'sk_core_news_sm',
-            'sl': 'sl_core_news_sm'
         }.get(lang_code)
         
         if model_name is None:
@@ -119,14 +115,10 @@ if __name__ == "__main__":
         "german": "de",
         "french": "fr",
         "spanish": "es",
-        "bulgarian": "bg",
         "italian": "it",
         "polish": "pl",
         "dutch": "nl",
-        "czech": "cs",
         "portuguese": "pt",
-        "slovak": "sk",
-        "slovenian": "sl"
     }
 
     supported_languages = set(language_to_code.keys())
