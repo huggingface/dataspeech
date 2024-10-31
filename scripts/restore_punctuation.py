@@ -5,11 +5,13 @@ from deepmultilingualpunctuation import PunctuationModel
 import spacy
 from typing import Dict, Callable, List
 import re
+from spacy.cli import download
 
 nlp_models: Dict[str, spacy.language.Language] = {}
 
 def load_spacy_model(lang_code: str) -> spacy.language.Language:
-    """Load and return the appropriate spaCy model for the given language code."""
+    """Load and return the appropriate spaCy model for the given language code.
+    Downloads the model if not already installed."""
     if lang_code not in nlp_models:
         model_name = {
             'ca': 'ca_core_news_sm',
@@ -26,7 +28,12 @@ def load_spacy_model(lang_code: str) -> spacy.language.Language:
         if model_name is None:
             raise ValueError(f"Unsupported language code: {lang_code}")
         
-        nlp_models[lang_code] = spacy.load(model_name)
+        try:
+            nlp_models[lang_code] = spacy.load(model_name)
+        except OSError:
+            print(f"Downloading {model_name}...")
+            download(model_name)
+            nlp_models[lang_code] = spacy.load(model_name)
     
     return nlp_models[lang_code]
 
