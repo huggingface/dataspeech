@@ -41,6 +41,7 @@ if __name__ == "__main__":
     recased_dataset = dataset.map(
         apply_recasing,
         batched=True,
+        num_proc=args.num_proc,
         batch_size=args.batch_size,
         fn_kwargs={"text_column": args.text_column, "description_column": args.description_column},
         desc="Applying recasing"
