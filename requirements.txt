@@ -1,5 +1,4 @@
-datasets[audio]
-https://github.com/marianne-m/brouhaha-vad/archive/main.zip
+datasets[audio]==3.2.0
 penn
 g2p
 demucs

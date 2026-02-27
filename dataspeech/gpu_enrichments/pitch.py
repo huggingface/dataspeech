@@ -1,4 +1,6 @@
-import torch 
+import torch
+from ._torbi_compat import ensure_torbi
+ensure_torbi()
 import penn
 
 
